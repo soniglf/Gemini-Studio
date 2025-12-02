@@ -1,6 +1,6 @@
 
 import React, { memo, useState } from 'react';
-import { GeneratedAsset } from '../../types';
+import { GeneratedAsset, Gender, GenerationResult } from '../../types';
 import { Loader } from '../Loader';
 import { Code, Check, Copy, Tag, Plus, Send, Lock, Hash, Scan, Image as ImageIcon } from 'lucide-react';
 import { ZoomableImage } from '../UI';
@@ -40,9 +40,10 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
     } = usePreviewController(onAssetSelect);
 
     const handleAddTag = async () => {
-        if (activeData && newTag.trim()) {
-            const updatedTags = [...(activeData.tags || []), newTag.trim()];
-            const updatedAsset = { ...activeData, tags: updatedTags };
+        if (activeData && 'id' in activeData && newTag.trim()) {
+            const assetData = activeData as GeneratedAsset;
+            const updatedTags = [...(assetData.tags || []), newTag.trim()];
+            const updatedAsset = { ...assetData, tags: updatedTags };
             await addAsset(updatedAsset); 
             if(onAssetSelect) onAssetSelect(updatedAsset);
             setNewTag("");
@@ -59,6 +60,11 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
 
     // Determine what to show
     const showBio = previewTab === 'BIO';
+
+    // Safe accessors for union type
+    const activeId = (activeData as GeneratedAsset)?.id;
+    const activePrompt = (activeData as GeneratedAsset)?.prompt || (activeData as GenerationResult)?.finalPrompt;
+    const activeSettings = (activeData as GeneratedAsset)?.settings;
 
     return (
         <div className="flex-1 flex flex-col h-full bg-black/50 relative overflow-hidden">
@@ -84,23 +90,18 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
                 {isLoading && !showBio ? (
                     <div className="text-center p-8"><Loader /><p className="mt-4 text-xs font-mono text-pink-500/70 animate-pulse">{t('PRE_GENERATING')}</p></div>
                 ) : showBio ? (
-                    // BIO MESH MODE
+                    // --- BIO MESH MODE (3D) ---
                     <div className="w-full h-full max-w-2xl aspect-[3/4] bg-[#0B1121] rounded-2xl overflow-hidden border border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.1)] relative group">
-                        <div className="absolute top-4 left-4 z-10 flex gap-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-900/40 backdrop-blur rounded border border-emerald-500/30">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <span className="text-[9px] font-mono font-bold text-emerald-400 tracking-wider">LIVE MESH // {bioFocus}</span>
-                            </div>
-                        </div>
                         
+                        {/* 3D VISUALIZER COMPONENT */}
                         <BioMeshVisualizer 
                             morphology={model?.morphology || DEFAULT_MORPHOLOGY} 
-                            gender={model?.gender || 'FEMALE'} 
-                            focus={bioFocus}
+                            gender={(model?.gender as Gender) || Gender.FEMALE} 
+                            view={bioFocus === 'BIO' ? 'SIDE' : 'FRONT'} 
                         />
                         
                         {/* Data Overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent flex justify-between text-xs font-mono text-emerald-400/80">
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent flex justify-between text-xs font-mono text-emerald-400/80 pointer-events-none">
                             <div>
                                 <p>H: {model?.morphology?.height || 50}</p>
                                 <p>W: {model?.morphology?.weight || 50}</p>
@@ -141,13 +142,13 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
                                         ))}
                                         
                                         {/* Seed Display */}
-                                        {activeData.settings?.seed !== undefined && (
+                                        {activeSettings?.seed !== undefined && (
                                             <button 
                                                 onClick={handleSeedReuse}
                                                 className="px-2 py-1 rounded bg-black/50 backdrop-blur border border-white/10 text-[9px] font-bold font-mono text-emerald-400 hover:text-white flex items-center gap-1 shadow-lg transition-colors"
                                                 title="Reuse Seed"
                                             >
-                                                <Hash size={10}/> {activeData.settings.seed} <Lock size={8}/>
+                                                <Hash size={10}/> {activeSettings.seed} <Lock size={8}/>
                                             </button>
                                         )}
 
@@ -205,7 +206,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
                                         onShare={handleShare}
                                         onDownload={handleDownload}
                                         showPrompt={showPrompt}
-                                        hasSettings={!!activeData.settings}
+                                        hasSettings={!!activeSettings}
                                         isVideo={!!isVideo}
                                     />
 
@@ -236,7 +237,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
                                     </button>
                                 </div>
                                 <pre className="text-[10px] font-mono text-slate-400 whitespace-pre-wrap leading-relaxed select-text">
-                                    {activeData.prompt || (activeData as any).finalPrompt}
+                                    {activePrompt}
                                 </pre>
                             </div>
                         )}
@@ -246,7 +247,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = memo(({ onAssetSelect }
                 )}
             </div>
 
-            {assets.length > 0 && !showBio && <AssetFilmstrip assets={assets.slice(0, 15)} selectedId={activeData?.id} onSelect={onAssetSelect!} />}
+            {assets.length > 0 && !showBio && <AssetFilmstrip assets={assets.slice(0, 15)} selectedId={activeId} onSelect={onAssetSelect!} />}
         </div>
     );
 });

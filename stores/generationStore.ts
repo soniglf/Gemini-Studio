@@ -78,8 +78,6 @@ async function executeGeneration(
             };
         }
         
-        setLastGenerated(result);
-        
         const asset: GeneratedAsset = {
             id: Date.now().toString() + i, 
             projectId: activeProject.id,
@@ -96,6 +94,8 @@ async function executeGeneration(
         
         await addAsset(asset);
         trackUsage(asset);
+        
+        setLastGenerated(asset);
     }
     
     useGenerationStore.setState({ isGenerating: false });
@@ -104,7 +104,7 @@ async function executeGeneration(
 
 interface GenerationState {
     isGenerating: boolean;
-    lastGenerated: GenerationResult | null;
+    lastGenerated: GeneratedAsset | GenerationResult | null;
     
     studioSettings: StudioSettings;
     influencerSettings: InfluencerSettings;
@@ -141,7 +141,7 @@ interface GenerationState {
     
     undo: () => void;
     redo: () => void;
-    setLastGenerated: (res: GenerationResult) => void;
+    setLastGenerated: (res: GeneratedAsset | GenerationResult) => void;
 }
 
 export const useGenerationStore = create<GenerationState>()(
@@ -279,6 +279,7 @@ export const useGenerationStore = create<GenerationState>()(
                          };
                          useGalleryStore.getState().addAsset(asset);
                          useBillingStore.getState().trackUsage(asset);
+                         set({ lastGenerated: asset });
                      }
                  } catch(e: any) {
                      addToast(e.message, 'error');
@@ -292,7 +293,6 @@ export const useGenerationStore = create<GenerationState>()(
                  try {
                      if (!asset.blob) throw new Error("Asset data missing");
                      const result = await EditAgent.refine(asset.blob, asset.prompt);
-                     set({ lastGenerated: result, isGenerating: false });
                      
                      // Add asset
                       const { activeProject } = useProjectStore.getState();
@@ -309,6 +309,9 @@ export const useGenerationStore = create<GenerationState>()(
                          };
                          useGalleryStore.getState().addAsset(newAsset);
                          useBillingStore.getState().trackUsage(newAsset);
+                         set({ lastGenerated: newAsset, isGenerating: false });
+                     } else {
+                        set({ lastGenerated: result, isGenerating: false });
                      }
                  } catch(e: any) {
                      addToast(e.message, 'error');

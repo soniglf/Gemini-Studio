@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect } from 'react';
 import { AppMode, GenerationTier, GeneratedAsset } from '../types';
 import { useUIStore } from '../stores/uiStore';
@@ -91,15 +90,7 @@ export const useAppController = () => {
     };
 
     const handleAssetSelect = (asset: GeneratedAsset) => {
-        setLastGenerated({
-            url: asset.url,
-            blob: asset.blob!,
-            finalPrompt: asset.prompt,
-            keyType: asset.keyType,
-            tier: asset.tier,
-            usedModel: asset.usedModel,
-            tags: asset.tags
-        });
+        setLastGenerated(asset);
     };
 
     return {

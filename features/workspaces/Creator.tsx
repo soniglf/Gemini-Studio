@@ -1,4 +1,3 @@
-
 import React, { memo, useState, useEffect } from 'react';
 import { ModelAttributes, GenerationTier, ModelMorphology } from '../../types';
 import { Button, Input, VisualGridSelect, ImageUpload, BiometricSlider } from '../../components/UI';
@@ -20,13 +19,17 @@ export const CreatorWorkspace = memo(() => {
     const [activeTab, setActiveTab] = useState<'BIO' | 'BODY' | 'FACE'>('BIO');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Sync UI Store for visualizer
+    // --- CEREBRO CONECTADO: Sync UI Store para el visualizador ---
     useEffect(() => {
-        if (activeTab === 'BODY') setBioFocus('BODY');
-        if (activeTab === 'FACE') setBioFocus('FACE');
-        // Auto-switch to BIO preview when editing morphology
-        if (activeTab !== 'BIO') setPreviewTab('BIO');
-    }, [activeTab]);
+        // 1. Mapear la pestaña activa al "Foco del Visualizador"
+        if (activeTab === 'BIO') setBioFocus('BIO');   // Activa la Vista Lateral (Perfil)
+        if (activeTab === 'BODY') setBioFocus('BODY'); // Activa Vista Frontal (Cuerpo)
+        if (activeTab === 'FACE') setBioFocus('FACE'); // Activa Vista Frontal (Cara)
+
+        // 2. Forzar que el Panel de Previsualización muestre el Visualizador (BIO tab)
+        // en lugar de la última imagen generada (ASSET tab)
+        setPreviewTab('BIO');
+    }, [activeTab, setBioFocus, setPreviewTab]);
 
     if(!model) return null;
 

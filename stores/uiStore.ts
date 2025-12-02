@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { AppMode, ToastMessage } from '../types';
 
@@ -7,7 +6,10 @@ interface UIState {
     toasts: ToastMessage[];
     mobileTab: 'EDITOR' | 'PREVIEW';
     previewTab: 'ASSET' | 'BIO';
-    bioFocus: 'BODY' | 'FACE'; // New state for mesh focus
+    
+    // --- CAMBIO CRÍTICO: Añadido 'BIO' para la vista de perfil ---
+    bioFocus: 'BODY' | 'FACE' | 'BIO'; 
+    
     isPro: boolean;
     isMobile: boolean;
     isSettingsOpen: boolean;
@@ -17,7 +19,10 @@ interface UIState {
     removeToast: (id: string) => void;
     setMobileTab: (tab: 'EDITOR' | 'PREVIEW') => void;
     setPreviewTab: (tab: 'ASSET' | 'BIO') => void;
-    setBioFocus: (focus: 'BODY' | 'FACE') => void;
+    
+    // Actualizada la firma de la función
+    setBioFocus: (focus: 'BODY' | 'FACE' | 'BIO') => void;
+    
     togglePro: () => void;
     setIsMobile: (isMobile: boolean) => void;
     setSettingsOpen: (open: boolean) => void;
@@ -28,7 +33,7 @@ export const useUIStore = create<UIState>((set) => ({
     toasts: [],
     mobileTab: 'EDITOR',
     previewTab: 'ASSET',
-    bioFocus: 'BODY',
+    bioFocus: 'BODY', // Valor inicial por defecto
     isPro: false,
     isMobile: false,
     isSettingsOpen: false,

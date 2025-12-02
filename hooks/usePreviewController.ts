@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { GeneratedAsset, AppMode } from '../types';
+import { GeneratedAsset, AppMode, GenerationResult } from '../types';
 import { useGenerationStore } from '../stores/generationStore';
 import { useDirectorStore } from '../stores/directorStore';
 import { useGalleryStore } from '../stores/galleryStore';
@@ -24,9 +23,13 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
 
     const activeData = lastGenerated || (assets && assets[0] ? assets[0] : null);
     
+    // Accessors for union types
+    const activePrompt = (activeData as GeneratedAsset)?.prompt || (activeData as GenerationResult)?.finalPrompt;
+    const activeId = (activeData as GeneratedAsset)?.id;
+    
     // Find previous version if this is a refinement/edit for Comparison
-    const previousVersion = activeData && activeData.prompt?.startsWith('REFINED:') 
-        ? assets.find(a => activeData.prompt.includes(a.prompt) && a.id !== activeData.id) 
+    const previousVersion = activeData && activePrompt?.startsWith('REFINED:') 
+        ? assets.find(a => activePrompt.includes(a.prompt) && a.id !== activeId) 
         : null;
 
     const isLoading = isGenerating || isShooting;
@@ -34,7 +37,7 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     useEffect(() => {
         setIsEditing(false);
         setCompareMode(!!previousVersion);
-    }, [activeData?.id]);
+    }, [activeId]);
 
     const handleShare = async () => {
         if (!activeData?.blob) return;
@@ -57,14 +60,14 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
         const url = URL.createObjectURL(blobWithDNA);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `gemini_${activeData.id}.png`;
+        a.download = `gemini_${activeId || 'preview'}.png`;
         a.click();
         URL.revokeObjectURL(url);
     };
 
     const copyPrompt = () => {
-        if(activeData?.prompt || (activeData as any)?.finalPrompt) {
-            navigator.clipboard.writeText(activeData?.prompt || (activeData as any)?.finalPrompt);
+        if(activePrompt) {
+            navigator.clipboard.writeText(activePrompt);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         }
@@ -81,7 +84,7 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     };
 
     const handleRefine = () => {
-        if (activeData) refine(activeData);
+        if (activeData && 'id' in activeData) refine(activeData as GeneratedAsset);
     };
 
     const handleSetReference = () => {
@@ -114,8 +117,9 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     };
 
     const handleSeedReuse = () => {
-        if (activeData?.settings?.seed) {
-            applyRefinement({ seed: activeData.settings.seed });
+        const settings = (activeData as GeneratedAsset)?.settings;
+        if (settings?.seed) {
+            applyRefinement({ seed: settings.seed });
         }
     };
 
