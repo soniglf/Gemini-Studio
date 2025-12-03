@@ -1,4 +1,6 @@
 
+import { AppMode } from "../types";
+
 export const THEME = {
     COLORS: {
         // Semantic Backgrounds - Lighter for readability
@@ -31,4 +33,15 @@ export const THEME = {
         GLOW_PINK: "shadow-[0_0_20px_rgba(236,72,153,0.4)]",
         TRANSITION: "transition-all duration-200",
     }
+};
+
+// Reactive Theme Definitions for App Modes
+export const MODE_COLORS = {
+    [AppMode.CREATOR]: { primary: '#ec4899', secondary: '#8b5cf6' }, // Pink/Purple
+    [AppMode.STUDIO]: { primary: '#06b6d4', secondary: '#3b82f6' }, // Cyan/Blue
+    [AppMode.INFLUENCER]: { primary: '#f59e0b', secondary: '#f43f5e' }, // Amber/Rose (Golden Hour)
+    [AppMode.MOTION]: { primary: '#8b5cf6', secondary: '#6366f1' }, // Violet/Indigo
+    [AppMode.DIRECTOR]: { primary: '#10b981', secondary: '#0ea5e9' }, // Emerald/Sky
+    [AppMode.GALLERY]: { primary: '#64748b', secondary: '#94a3b8' }, // Slate
+    [AppMode.BILLING]: { primary: '#22c55e', secondary: '#eab308' }, // Green/Yellow
 };

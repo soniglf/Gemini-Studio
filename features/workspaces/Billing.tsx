@@ -2,7 +2,7 @@
 import React, { memo, useState, useEffect } from 'react';
 import { UsageDashboard } from '../billing/UsageDashboard';
 import { Button, Card, Input } from '../../components/UI';
-import { ShieldCheck, CreditCard, Activity, HardDrive, Archive, Server, Lock, Key, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, CreditCard, Activity, HardDrive, Archive, Server, Lock, Key, Plus, Trash2, AlertTriangle, RefreshCcw, ExternalLink, Globe } from 'lucide-react';
 import { KeyVault, KeyHealth } from '../../services/ai/keyVault';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useBillingStore } from '../../stores/billingStore';
@@ -17,18 +17,20 @@ export const BillingWorkspace = memo(() => {
     // Key Management State
     const [newKey, setNewKey] = useState("");
     const [keyType, setKeyType] = useState<'FREE' | 'PAID'>('PAID');
-    const [localKeys, setLocalKeys] = useState(KeyVault.getPool());
+    const [localKeys, setLocalKeys] = useState<any[]>([]);
     
     const { t } = useTranslation();
 
     const refreshHealth = () => {
         setHealth(KeyVault.getHealth());
-        setLocalKeys(KeyVault.getPool());
+        // Force refresh from Vault
+        setLocalKeys([...KeyVault.getPool()]);
         checkStorage();
     };
 
     useEffect(() => {
         refreshHealth();
+        // Sincronización periódica
         const interval = setInterval(refreshHealth, 5000);
         return () => clearInterval(interval);
     }, []);
@@ -45,19 +47,51 @@ export const BillingWorkspace = memo(() => {
     };
 
     const handleRemoveKey = (id: string) => {
-        if(confirm("Remove this key?")) {
+        if (window.confirm("Permanently remove this API Key?")) {
+            // 1. ACTUALIZACIÓN OPTIMISTA (UI Primero)
+            // Eliminamos la llave de la vista inmediatamente para feedback instantáneo
+            setLocalKeys(prev => prev.filter(k => k.id !== id));
+            
+            // 2. ACTUALIZACIÓN LÓGICA (Persistencia)
             KeyVault.removeKey(id);
+            
+            // 3. Sincronizar estado global
             refreshHealth();
             addToast("Key removed", 'info');
         }
     };
 
+    const handleNukeKeys = () => {
+        if (confirm("DANGER: This will remove ALL keys from your local vault. Continue?")) {
+            localStorage.removeItem('gemini_studio_keys_v1'); // Limpieza forzada directa
+            window.location.reload(); // Recarga para limpiar estado
+        }
+    };
+
     const handleSmartArchive = async () => {
-        if(!confirm("Smart Archive:\n- Compresses 'Sketch' images to JPEG\n- Preserves 'Render' images\n- Frees up browser storage\n\nProceed?")) return;
+        if(!window.confirm("Smart Archive:\n- Compresses 'Sketch' images to JPEG\n- Preserves 'Render' images\n- Frees up browser storage\n\nProceed?")) return;
         setIsOptimizing(true);
         const freed = await optimizeStorage(false); // SAFE mode
         addToast(`Archival Complete. Freed ${(freed / 1024 / 1024).toFixed(2)} MB.`, 'success');
         setIsOptimizing(false);
+    };
+
+    const handleAIStudioSelect = async () => {
+        const aiStudio = (window as any).aistudio;
+        if (aiStudio && aiStudio.openSelectKey) {
+            try {
+                await aiStudio.openSelectKey();
+                // Race condition mitigation: Assume success immediately
+                addToast("AI Studio Key Selected", 'success');
+                // Force a refresh of health status (though env var injection might take a moment to propagate in some contexts)
+                setTimeout(refreshHealth, 1000);
+            } catch (e) {
+                console.error(e);
+                addToast("Key Selection Cancelled", 'info');
+            }
+        } else {
+            addToast("AI Studio Interface unavailable", 'error');
+        }
     };
 
     const usagePercent = stats.storageQuota > 0 ? (stats.storageUsage / stats.storageQuota) * 100 : 0;
@@ -75,7 +109,7 @@ export const BillingWorkspace = memo(() => {
                     <span className="text-xs font-bold uppercase tracking-widest">{t('BIL_GATEWAY')}</span>
                 </div>
 
-                <div className={`p-6 rounded-xl border flex items-center justify-between ${isSystemActive ? 'bg-emerald-900/10 border-emerald-500/20' : 'bg-red-900/10 border-red-500/20'}`}>
+                <div className={`p-6 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isSystemActive ? 'bg-emerald-900/10 border-emerald-500/20' : 'bg-red-900/10 border-red-500/20'}`}>
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isSystemActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {isSystemActive ? <Lock size={24} /> : <Server size={24} />}
@@ -84,11 +118,18 @@ export const BillingWorkspace = memo(() => {
                             <h3 className="text-lg font-bold text-white">
                                 {health?.hasEnv ? "Platform Gateway Active" : "System Gateway Offline"}
                             </h3>
-                            <p className="text-xs text-white/50">
+                            <p className="text-xs text-white/50 mb-2">
                                 {health?.hasEnv
                                     ? "Primary authentication provided by environment." 
                                     : "No environment key found. Falling back to personal key pool."}
                             </p>
+                            {/* AI STUDIO INTEGRATION BUTTON */}
+                            <button 
+                                onClick={handleAIStudioSelect}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-300 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                            >
+                                <Globe size={12} /> Select Paid Key via AI Studio
+                            </button>
                         </div>
                     </div>
                     
@@ -110,9 +151,16 @@ export const BillingWorkspace = memo(() => {
 
             {/* MANUAL KEY POOL */}
             <div className="animate-in slide-in-from-bottom-2">
-                 <div className="flex items-center gap-2 text-pink-400 mb-4">
-                    <Key size={18} />
-                    <span className="text-xs font-bold uppercase tracking-widest">{t('BIL_POOL')}</span>
+                 <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-pink-400">
+                        <Key size={18} />
+                        <span className="text-xs font-bold uppercase tracking-widest">{t('BIL_POOL')}</span>
+                    </div>
+                    {localKeys.length > 0 && (
+                        <button onClick={handleNukeKeys} className="text-[9px] text-red-400 hover:text-red-300 flex items-center gap-1">
+                            <Trash2 size={10}/> Reset All Keys
+                        </button>
+                    )}
                 </div>
                 
                 <Card className="p-6 bg-slate-900/50">
@@ -155,7 +203,15 @@ export const BillingWorkspace = memo(() => {
                                         <span className="text-[9px] text-white/30">Added: {new Date(k.addedAt).toLocaleDateString()}</span>
                                     </div>
                                 </div>
-                                <button onClick={() => handleRemoveKey(k.id)} className="p-2 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors">
+                                <button 
+                                    onClick={(e) => { 
+                                        e.preventDefault(); 
+                                        e.stopPropagation(); 
+                                        handleRemoveKey(k.id); 
+                                    }}
+                                    className="p-2 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                                    title="Remove Key"
+                                >
                                     <Trash2 size={14} />
                                 </button>
                             </div>

@@ -1,25 +1,29 @@
-
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { DirectorPlan, DirectorShot, GeneratedAsset, AppMode, ModelAttributes, GenerationTier, GenerationResult, AuditReport } from '../types';
-import { generateDirectorPlan } from '../services/ai/director';
-import { generateStudioImage, generateInfluencerImage, auditCampaign } from '../services/geminiService';
-import { DirectorAgent } from '../services/ai/agents/directorAgent';
-import { DEFAULT_MODEL } from '../data/constants';
+import { GenerationService } from '../services/ai/generationService';
 import { useUIStore } from './uiStore';
 import { useProjectStore } from './projectStore';
 import { useGalleryStore } from './galleryStore';
 import { useBillingStore } from './billingStore';
+import { useModelStore } from './modelStore';
+import { useTaskManagerStore } from './taskManagerStore';
+
+const DIRECTOR_STORE_VERSION = 2;
 
 interface DirectorState {
+    version: number;
     plan: DirectorPlan | null;
     brief: string;
-    intensity: number; // 0-100 Cinematic Intensity
+    intensity: number;
     isPlanning: boolean;
     isShooting: boolean;
     castModel: ModelAttributes | null;
     auditReport: AuditReport | null;
     isAuditing: boolean;
+    editingShotId: string | null;
+    rejectingShotId: string | null;
+    feedbackText: string;
 
     setBrief: (s: string) => void;
     setIntensity: (n: number) => void;
@@ -30,242 +34,206 @@ interface DirectorState {
     executePlan: () => Promise<void>;
     regenerateShot: (shotId: string, feedback: string) => Promise<void>;
     runAudit: () => Promise<void>;
-    
-    // CRUD Actions
     updateShot: (id: string, updates: Partial<DirectorShot>) => void;
     deleteShot: (id: string) => void;
     addShot: () => void;
+    startEditing: (id: string) => void;
+    cancelEditing: () => void;
+    startRejection: (id: string) => void;
+    cancelRejection: () => void;
+    setFeedbackText: (text: string) => void;
+    submitRejection: () => Promise<void>;
 }
 
-// Helper for Concurrency limit
-async function asyncPool(poolLimit: number, array: any[], iteratorFn: any) {
+async function asyncPool<T>(poolLimit: number, array: T[], iteratorFn: (item: T, array: T[]) => Promise<any>): Promise<any[]> {
     const ret: Promise<any>[] = [];
     const executing: Promise<any>[] = [];
     for (const item of array) {
         const p = Promise.resolve().then(() => iteratorFn(item, array));
         ret.push(p);
-
         if (poolLimit <= array.length) {
             const e: Promise<any> = p.then(() => executing.splice(executing.indexOf(e), 1));
             executing.push(e);
-            if (executing.length >= poolLimit) {
-                await Promise.race(executing);
-            }
+            if (executing.length >= poolLimit) await Promise.race(executing);
         }
     }
     return Promise.all(ret);
 }
 
+const stripHeavyData = (model: ModelAttributes | null): ModelAttributes | null => {
+    if (!model) return null;
+    const { referenceImage, referenceImages, accessoriesImage, ...rest } = model;
+    return rest as ModelAttributes;
+};
+const rehydrateModel = (lightModel: ModelAttributes | null): ModelAttributes | null => {
+    if (!lightModel) return null;
+    const fullModel = useModelStore.getState().savedModels.find(m => m.id === lightModel.id);
+    return fullModel || lightModel;
+};
+
 export const useDirectorStore = create<DirectorState>()(
     persist(
         (set, get) => ({
-            plan: null,
-            brief: "",
-            intensity: 50,
-            isPlanning: false,
-            isShooting: false,
-            castModel: null,
-            auditReport: null,
-            isAuditing: false,
+            version: DIRECTOR_STORE_VERSION,
+            plan: null, brief: "", intensity: 50, isPlanning: false, isShooting: false, castModel: null, auditReport: null, isAuditing: false,
+            editingShotId: null, rejectingShotId: null, feedbackText: "",
 
             setBrief: (brief) => set({ brief }),
             setIntensity: (intensity) => set({ intensity }),
             setCastModel: (castModel) => set({ castModel }),
             setPlan: (plan) => set({ plan }),
-
-            suggestBrief: () => {
-                set({ brief: DirectorAgent.generateProceduralBrief() });
-            },
+            suggestBrief: () => set({ brief: GenerationService.generateProceduralBrief() }),
 
             createPlan: async () => {
                 const { brief, castModel } = get();
                 if (!brief.trim()) return;
-                set({ isPlanning: true });
+                set({ isPlanning: true, plan: null });
                 try {
-                    const newPlan = await generateDirectorPlan(brief, castModel || undefined);
+                    const fullCastModel = rehydrateModel(castModel);
+                    const newPlan = await GenerationService.generateDirectorPlan(brief, fullCastModel || undefined);
                     set({ plan: newPlan });
-                } catch (e) {
-                    useUIStore.getState().addToast("Failed to create plan", 'error');
+                } catch (e: any) {
+                    useUIStore.getState().addToast(e.message, 'error');
                 } finally {
                     set({ isPlanning: false });
                 }
             },
 
             executePlan: async () => {
-                const { plan, castModel, intensity } = get();
+                const { plan, castModel, intensity, isShooting } = get();
                 const { activeProject } = useProjectStore.getState();
-                
-                if (!plan || !activeProject) return;
+                const { addTask, updateTask, removeTask } = useTaskManagerStore.getState();
+
+                if (!plan || !activeProject || isShooting) return;
+
+                const fullCastModel = rehydrateModel(castModel) || (plan.modelBrief as ModelAttributes);
+                if (!fullCastModel) {
+                    useUIStore.getState().addToast("Casting model not found.", 'error');
+                    return;
+                }
+
+                const shotsToRun = plan.shots.filter(s => s.status === 'PENDING');
+                if (shotsToRun.length === 0) return;
+
                 set({ isShooting: true });
+                const taskId = `campaign-${Date.now()}`;
+                addTask({ id: taskId, name: `Shooting: ${plan.campaignName}`, status: 'running', progress: 0 });
 
-                const campaignModel: ModelAttributes = castModel ? {
-                    ...castModel,
-                    clothingStyle: plan.modelBrief.clothingStyle || castModel.clothingStyle
-                } : {
-                    ...DEFAULT_MODEL,
-                    ...plan.modelBrief,
-                    id: 'director-temp-' + Date.now(),
-                    distinctiveFeatures: plan.modelBrief.clothingStyle || ""
-                } as ModelAttributes;
+                let completed = 0;
 
-                const shotsToProcess = plan.shots.filter(s => s.status !== 'DONE');
-
-                // PARALLEL EXECUTION PIPELINE
-                const concurrency = 2; // Reduced slightly for better stability
-
-                await asyncPool(concurrency, shotsToProcess, async (shot: DirectorShot) => {
-                    set(state => ({ 
-                        plan: state.plan ? { 
-                            ...state.plan, 
-                            shots: state.plan.shots.map(s => s.id === shot.id ? { ...s, status: 'GENERATING' } : s) 
-                        } : null 
-                    }));
-
+                const worker = async (shot: DirectorShot) => {
                     try {
-                        await executeSingleShot(shot, campaignModel, activeProject.id, intensity, activeProject.customInstructions);
-                        
-                        set(state => ({ 
-                            plan: state.plan ? { 
-                                ...state.plan, 
-                                shots: state.plan.shots.map(s => s.id === shot.id ? { ...s, status: 'DONE' } : s) 
-                            } : null 
-                        }));
+                        set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shot.id ? { ...s, status: 'GENERATING' } : s) }}));
+                        const assetId = await executeSingleShot(shot, fullCastModel, activeProject.id, intensity, activeProject.customInstructions);
+                        set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shot.id ? { ...s, status: 'DONE', resultAssetId: assetId } : s) }}));
                     } catch (e) {
-                        set(state => ({ 
-                            plan: state.plan ? { 
-                                ...state.plan, 
-                                shots: state.plan.shots.map(s => s.id === shot.id ? { ...s, status: 'FAILED' } : s) 
-                            } : null 
-                        }));
+                        console.error("Shot failed:", e);
+                        set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shot.id ? { ...s, status: 'FAILED' } : s) }}));
+                    } finally {
+                        completed++;
+                        updateTask(taskId, { progress: (completed / shotsToRun.length) * 100 });
                     }
-                });
+                };
+
+                await asyncPool(2, shotsToRun, worker);
 
                 set({ isShooting: false });
-                useUIStore.getState().addToast("Campaign Shoot Complete", 'success');
+                updateTask(taskId, { status: 'completed', message: 'Campaign shoot finished.' });
+                setTimeout(() => removeTask(taskId), 5000);
+            },
+            
+            regenerateShot: async (shotId, feedback) => {
+                const { plan, castModel, intensity } = get();
+                const { activeProject } = useProjectStore.getState();
+                if (!plan || !activeProject) return;
+
+                const shot = plan.shots.find(s => s.id === shotId);
+                if (!shot) return;
+                
+                const fullCastModel = rehydrateModel(castModel) || (plan.modelBrief as ModelAttributes);
+                
+                set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shotId ? { ...s, status: 'GENERATING', feedback } : s) }}));
+                
+                try {
+                    const assetId = await executeSingleShot(shot, fullCastModel, activeProject.id, intensity, activeProject.customInstructions, feedback);
+                    set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shotId ? { ...s, status: 'DONE', resultAssetId: assetId, feedback: undefined } : s) }}));
+                } catch (e) {
+                    set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shotId ? { ...s, status: 'FAILED' } : s) }}));
+                }
             },
 
             runAudit: async () => {
                 const { activeProject } = useProjectStore.getState();
                 const { assets } = useGalleryStore.getState();
-                if(!activeProject) return;
+                if (!activeProject) return;
 
-                set({ isAuditing: true });
+                set({ isAuditing: true, auditReport: null });
                 try {
-                    const allTags = assets.flatMap(a => a.tags || []);
-                    const report = await auditCampaign(activeProject, allTags);
+                    const tags = assets.flatMap(a => a.tags || []);
+                    const report = await GenerationService.audit(activeProject, tags);
                     set({ auditReport: report });
-                    useUIStore.getState().addToast("Campaign Audit Complete", 'success');
-                } catch(e) {
-                    console.error(e);
-                    useUIStore.getState().addToast("Audit Failed", 'error');
+                } catch (e: any) {
+                    useUIStore.getState().addToast(e.message, 'error');
                 } finally {
                     set({ isAuditing: false });
                 }
             },
-
-            regenerateShot: async (shotId: string, feedback: string) => {
-                const { plan, castModel, intensity } = get();
-                const { activeProject } = useProjectStore.getState();
-                
-                if (!plan || !activeProject) return;
-
-                const shot = plan.shots.find(s => s.id === shotId);
-                if(!shot) return;
-
-                set({ plan: { ...plan, shots: plan.shots.map(s => s.id === shotId ? { ...s, status: 'GENERATING', feedback } : s) } });
-
-                const campaignModel: ModelAttributes = castModel ? {
-                    ...castModel,
-                    clothingStyle: plan.modelBrief.clothingStyle || castModel.clothingStyle
-                } : {
-                    ...DEFAULT_MODEL,
-                    ...plan.modelBrief,
-                    id: 'director-temp-' + Date.now(),
-                    distinctiveFeatures: plan.modelBrief.clothingStyle || ""
-                } as ModelAttributes;
-
-                try {
-                     await executeSingleShot(shot, campaignModel, activeProject.id, intensity, activeProject.customInstructions, feedback);
-                     set({ plan: { ...plan, shots: get().plan!.shots.map(s => s.id === shotId ? { ...s, status: 'DONE' } : s) } });
-                     useUIStore.getState().addToast("Shot Regenerated with Feedback", 'success');
-                } catch(e) {
-                     set({ plan: { ...plan, shots: get().plan!.shots.map(s => s.id === shotId ? { ...s, status: 'FAILED' } : s) } });
-                     useUIStore.getState().addToast("Regeneration Failed", 'error');
+            updateShot: (id, updates) => set(state => state.plan ? { plan: { ...state.plan, shots: state.plan.shots.map(s => s.id === id ? { ...s, ...updates } : s) } } : {}),
+            deleteShot: (id) => set(state => state.plan ? { plan: { ...state.plan, shots: state.plan.shots.filter(s => s.id !== id) } } : {}),
+            addShot: () => set(state => state.plan ? { plan: { ...state.plan, shots: [...state.plan.shots, { id: `shot-${Date.now()}`, type: 'INFLUENCER', description: 'New shot', visualDetails: 'As per campaign vibe', status: 'PENDING' }]}} : {}),
+            startEditing: (id) => set({ editingShotId: id }),
+            cancelEditing: () => set({ editingShotId: null }),
+            startRejection: (id) => set({ rejectingShotId: id, feedbackText: "" }),
+            cancelRejection: () => set({ rejectingShotId: null, feedbackText: "" }),
+            setFeedbackText: (text) => set({ feedbackText: text }),
+            submitRejection: async () => {
+                const { rejectingShotId, feedbackText } = get();
+                if (rejectingShotId) {
+                    await get().regenerateShot(rejectingShotId, feedbackText);
+                    set({ rejectingShotId: null, feedbackText: "" });
                 }
             },
-
-            updateShot: (id, updates) => {
-                const { plan } = get();
-                if(!plan) return;
-                set({ plan: { ...plan, shots: plan.shots.map(s => s.id === id ? { ...s, ...updates } : s) } });
-            },
-
-            deleteShot: (id) => {
-                const { plan } = get();
-                if(!plan) return;
-                set({ plan: { ...plan, shots: plan.shots.filter(s => s.id !== id) } });
-            },
-
-            addShot: () => {
-                const { plan } = get();
-                if(!plan) return;
-                const newShot: DirectorShot = {
-                    id: `shot-${Date.now()}`,
-                    type: 'STUDIO',
-                    description: "New shot description...",
-                    visualDetails: "Lighting and camera details...",
-                    status: 'PENDING'
-                };
-                set({ plan: { ...plan, shots: [...plan.shots, newShot] } });
-            }
         }),
         {
             name: 'gemini-director-store',
             storage: createJSONStorage(() => localStorage),
-            partialize: (state) => ({ 
-                // Only persist data, not transient loading states
-                plan: state.plan, 
+            version: DIRECTOR_STORE_VERSION,
+            onRehydrateStorage: (state) => {
+                if (state?.version !== DIRECTOR_STORE_VERSION) {
+                    console.warn("Director store version mismatch, resetting plan.");
+                    state?.setPlan(null);
+                }
+            },
+            partialize: (state) => ({
+                version: state.version,
                 brief: state.brief,
+                plan: state.plan,
                 intensity: state.intensity,
-                castModel: state.castModel,
-                auditReport: state.auditReport 
+                castModel: stripHeavyData(state.castModel)
             })
         }
     )
 );
 
-async function executeSingleShot(shot: DirectorShot, model: ModelAttributes, projectId: string, intensity: number, projectContext?: string, feedback?: string) {
-    const { addAsset } = useGalleryStore.getState();
-    const { trackUsage } = useBillingStore.getState();
-    const { plan } = useDirectorStore.getState();
-
-    const baseVibe = `${plan?.campaignName || 'Campaign'} Aesthetic. ${plan?.modelBrief.clothingStyle || "Fashion"}`;
-    const { settings, mode } = DirectorAgent.mapShotToSettings(shot, baseVibe, intensity);
-
+async function executeSingleShot(shot: DirectorShot, model: ModelAttributes, projectId: string, intensity: number, projectContext?: string, feedback?: string): Promise<string> {
+    const { settings, mode } = GenerationService.mapShotToSettings(shot, model.visualVibe, intensity, projectContext);
     let result: GenerationResult;
-    if (mode === 'STUDIO') {
-        result = await generateStudioImage(model, settings as any, GenerationTier.RENDER, projectContext, feedback);
+    
+    // [Project Chimera] Using the unified GenerationService compatibility wrappers
+    if (mode === AppMode.STUDIO) {
+        result = await GenerationService.generateStudio(model, settings as any, GenerationTier.RENDER, projectContext, feedback);
     } else {
-        result = await generateInfluencerImage(model, settings as any, GenerationTier.RENDER, projectContext, feedback);
+        result = await GenerationService.generateInfluencer(model, settings as any, GenerationTier.RENDER, projectContext, feedback);
     }
 
     const asset: GeneratedAsset = {
-        id: Date.now().toString(),
-        projectId: projectId,
-        url: result.url,
-        blob: result.blob,
-        type: 'IMAGE',
-        prompt: result.finalPrompt,
-        timestamp: Date.now(),
-        mode: AppMode.DIRECTOR,
-        isMagic: true,
-        modelId: model.id,
-        usedModel: result.usedModel,
-        keyType: result.keyType,
-        tier: result.tier,
-        cost: 0.04,
-        tags: result.tags
+        id: `asset-${Date.now()}`, projectId, url: result.url, blob: result.blob,
+        type: 'IMAGE', prompt: result.finalPrompt, timestamp: Date.now(),
+        mode, isMagic: false, modelId: model.id, usedModel: result.usedModel,
+        keyType: result.keyType, tier: result.tier, cost: 0.04, settings, tags: result.tags
     };
-    await addAsset(asset);
-    trackUsage(asset);
+    
+    await useGalleryStore.getState().addAsset(asset);
+    useBillingStore.getState().trackUsage(asset);
+    return asset.id;
 }

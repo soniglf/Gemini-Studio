@@ -1,24 +1,34 @@
 
-import React, { memo, useEffect, useState } from 'react';
-import { MotionSettings, GenerationTier } from '../../types';
+import React, { memo } from 'react';
+import { MotionSettings } from '../../types';
 import { ProControls, WorkspaceDock } from './Shared';
 import { TextArea, VisualGridSelect, DebouncedInput, VisualAspectSelect, ImageUpload } from '../../components/UI';
 import { LocationSelector } from '../shared/LocationSelector';
 import { ImagePlus } from 'lucide-react';
-import { OPTIONS } from '../../data/constants';
+import { OPTIONS } from '../../data/options';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { useGenerationStore } from '../../stores/generationStore';
-import { useUIStore } from '../../stores/uiStore';
+import { useWorkspace } from '../../hooks/useWorkspace';
+import { AppMode } from '../../types';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export const MotionWorkspace = memo(() => {
-    const { motionSettings, setMotionSettings, generate, locationPreviews, isPreviewLoading, fetchPreviews, isGenerating } = useGenerationStore();
-    const { isPro } = useUIStore();
     const { t } = useTranslation();
-    const [tier, setTier] = useState<GenerationTier>(GenerationTier.RENDER);
+    const {
+        settings,
+        update,
+        isPro,
+        tier,
+        setTier,
+        onGenerate,
+        isGenerating,
+        locationPreviews,
+        isPreviewLoading,
+        setSettings,
+    } = useWorkspace(AppMode.MOTION);
 
-    useEffect(() => { fetchPreviews(); }, [motionSettings.location]);
-
-    const update = (field: keyof MotionSettings, value: any) => setMotionSettings({ ...motionSettings, [field]: value });
+    useKeyboardShortcuts({ onGenerate }); 
+    
+    const motionSettings = settings as MotionSettings;
 
     const mapOptions = (opts: string[], prefix: string) => opts.map(v => ({
         value: v,
@@ -27,9 +37,8 @@ export const MotionWorkspace = memo(() => {
 
     return (
         <div className="space-y-4 pb-32 animate-in fade-in">
-            {isPro && <ProControls settings={motionSettings} setSettings={setMotionSettings} isVideo={true} />}
+            {isPro && <ProControls settings={motionSettings} setSettings={setSettings} isVideo={true} />}
 
-            {/* Image to Video Input */}
             <div className="bg-slate-900/30 p-4 rounded-xl border border-white/5 mb-4">
                 <div className="flex items-center gap-2 mb-3 text-pink-400">
                     <ImagePlus size={16} />
@@ -55,7 +64,7 @@ export const MotionWorkspace = memo(() => {
             </div>
 
             <WorkspaceDock 
-                onGenerate={() => generate(tier)}
+                onGenerate={onGenerate}
                 isGenerating={isGenerating}
                 tier={tier}
                 setTier={setTier}

@@ -1,12 +1,8 @@
-
 import { db } from './db';
 import { GeneratedAsset, GenerationTier } from '../types';
 
 export class StorageService {
     
-    /**
-     * Estimates current storage usage and quota.
-     */
     static async estimate(): Promise<{ usage: number, quota: number }> {
         if ('storage' in navigator && 'estimate' in navigator.storage) {
             const estimate = await navigator.storage.estimate();
@@ -18,9 +14,6 @@ export class StorageService {
         return { usage: 0, quota: 0 };
     }
 
-    /**
-     * Converts a Blob to JPEG with specified quality.
-     */
     private static async compressBlob(blob: Blob, quality: number = 0.8): Promise<Blob> {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -56,27 +49,23 @@ export class StorageService {
         });
     }
 
-    /**
-     * Smart Archival Strategy:
-     * 1. Prioritize compressing SKETCH tier assets (Drafts).
-     * 2. Only compress RENDER tier if 'aggressive' mode is on.
-     */
-    static async optimizeStorage(aggressive: boolean = false): Promise<number> {
+    static async optimizeStorage(aggressive: boolean = false, onProgress?: (p: number) => void): Promise<number> {
         const allAssets = await db.assets.getAll();
         let freedBytes = 0;
+        let processed = 0;
 
         for (const asset of allAssets) {
-            // Skip Videos and already compressed items
+            processed++;
+            if (onProgress) onProgress((processed / allAssets.length) * 100);
+
             if (asset.type === 'VIDEO' || asset.isCompressed || !asset.blob) continue;
 
             const isSketch = asset.tier === GenerationTier.SKETCH;
             
-            // Policy: Always compress Sketches. Only compress Renders if Aggressive.
             if (isSketch || aggressive) {
                 const originalSize = asset.blob.size;
                 
                 try {
-                    // Compress to JPEG 80%
                     const compressedBlob = await this.compressBlob(asset.blob, 0.8);
                     const newSize = compressedBlob.size;
 
@@ -87,12 +76,10 @@ export class StorageService {
                             isCompressed: true,
                         };
                         
-                        // We must strip the URL before saving to DB as per repo pattern
                         await db.assets.add(updatedAsset);
                         freedBytes += (originalSize - newSize);
                     }
                 } catch (e) {
-                    // Fail silently but log, continue to next asset
                     console.debug(`Skipped asset ${asset.id} compression`, e);
                 }
             }

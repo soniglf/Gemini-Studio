@@ -13,12 +13,16 @@ export const DragDropZone: React.FC<{ children: React.ReactNode }> = ({ children
     const { importPreset } = usePresetStore();
     const { addToast } = useUIStore();
 
+    // Helper to check if event happened on a local drop zone
+    const isLocalDrop = (e: React.DragEvent) => {
+        const path = e.nativeEvent.composedPath() as HTMLElement[];
+        return path.some(el => el.getAttribute && el.getAttribute('data-no-global-drop') === 'true');
+    };
+
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         
-        // CRITICAL FIX: Ignore if hovering a local drop zone (like Clone Engine) to prevent overlay blocking
-        const target = e.target as HTMLElement;
-        if (target.closest('[data-no-global-drop="true"]')) {
+        if (isLocalDrop(e)) {
             setIsDragging(false);
             return;
         }
@@ -35,16 +39,16 @@ export const DragDropZone: React.FC<{ children: React.ReactNode }> = ({ children
   
     const handleDragLeave = useCallback((e: React.DragEvent) => {
         e.preventDefault();
-        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-        setIsDragging(false);
+        // Only disable if we are leaving the window
+        if (e.clientX === 0 && e.clientY === 0) {
+            setIsDragging(false);
+        }
     }, []);
   
     const handleDrop = useCallback(async (e: React.DragEvent) => {
         e.preventDefault();
         
-        // Ignore drops on local zones (safety check, though dragOver usually handles it)
-        const target = e.target as HTMLElement;
-        if (target.closest('[data-no-global-drop="true"]')) {
+        if (isLocalDrop(e)) {
             setIsDragging(false);
             return;
         }
@@ -53,6 +57,12 @@ export const DragDropZone: React.FC<{ children: React.ReactNode }> = ({ children
         const file = e.dataTransfer.files[0];
         
         if (!file) return;
+
+        // SIZE SAFETY CHECK (50MB Limit) to prevent OOM Crash
+        if (file.size > 50 * 1024 * 1024) {
+            addToast("File too large (Max 50MB)", 'error');
+            return;
+        }
 
         // CASE 1: DNA REHYDRATION
         if (file.type === 'image/png') {
@@ -93,9 +103,9 @@ export const DragDropZone: React.FC<{ children: React.ReactNode }> = ({ children
             onDrop={handleDrop}
         >
             {isDragging && (
-                <div className="absolute inset-0 z-[100] pointer-events-none animate-in fade-in flex flex-col justify-start items-center pt-8">
+                <div className="absolute inset-0 z-[100] pointer-events-none animate-in fade-in flex flex-col justify-start items-center pt-8 bg-black/60 backdrop-blur-sm">
                     {/* Heads-Up Badge */}
-                    <div className="bg-slate-900/90 backdrop-blur-md border border-white/20 px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 z-50">
+                    <div className="bg-slate-900/90 backdrop-blur-md border border-white/20 px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 z-50 mt-10">
                         {dropType === 'IMAGE' ? (
                             <>
                                 <UploadCloud size={24} className="text-pink-500 animate-bounce" />
@@ -115,8 +125,7 @@ export const DragDropZone: React.FC<{ children: React.ReactNode }> = ({ children
                         )}
                     </div>
                     
-                    {/* Cinematic Border Frame - Does NOT obscure center content */}
-                    <div className="absolute inset-4 border-2 border-dashed border-white/10 rounded-3xl"></div>
+                    <div className="absolute inset-4 border-2 border-dashed border-white/20 rounded-3xl"></div>
                 </div>
             )}
             {children}

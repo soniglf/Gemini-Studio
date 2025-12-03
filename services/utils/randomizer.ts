@@ -1,6 +1,7 @@
 
 import { StudioSettings, InfluencerSettings, MotionSettings, Lighting, ShotType, TimeOfDay, Vibe } from '../../types';
-import { INITIAL_STUDIO, INITIAL_INFLUENCER, INITIAL_MOTION, OPTIONS } from '../../data/constants';
+import { INITIAL_STUDIO, INITIAL_INFLUENCER, INITIAL_MOTION } from '../../data/defaults';
+import { OPTIONS } from '../../data/options';
 
 export class RandomizerService {
     private static pick<T>(array: T[]): T {

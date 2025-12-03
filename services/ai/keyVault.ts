@@ -41,15 +41,27 @@ class KeyManager {
     }
 
     /**
-     * Adds a key to the local pool.
+     * Adds a key to the local pool with validation.
      */
     addKey(key: string, type: 'FREE' | 'PAID', label?: string) {
-        if (!key || key.length < 10) throw new Error("Invalid API Key format");
-        if (this.keys.some(k => k.key === key)) throw new Error("Key already exists in pool");
+        const cleanKey = key.trim();
+        
+        // Google API Key Regex: Starts with AIza, 39 chars total usually
+        const googleKeyPattern = /^AIza[0-9A-Za-z-_]{35}$/;
+
+        if (!cleanKey) throw new Error("API Key cannot be empty");
+        if (!googleKeyPattern.test(cleanKey)) {
+            // We allow a slightly looser check just in case formatting changes, but must start with AIza
+            if (!cleanKey.startsWith('AIza')) {
+                throw new Error("Invalid Format: Google API Keys must start with 'AIza'");
+            }
+        }
+        
+        if (this.keys.some(k => k.key === cleanKey)) throw new Error("Key already exists in pool");
 
         this.keys.push({
             id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-            key,
+            key: cleanKey,
             type,
             label: label || `${type} Key ${this.keys.filter(k => k.type === type).length + 1}`,
             addedAt: Date.now(),
@@ -65,26 +77,18 @@ class KeyManager {
 
     /**
      * Retrieves a key based on the requested tier.
-     * Strategy:
-     * 1. Look for a key in the specific user pool (Free/Paid).
-     * 2. If User Pool has keys, pick one (Simple Load Balancing).
-     * 3. If User Pool is empty:
-     *    - If PAID requested: Fallback to process.env.API_KEY (Gateway).
-     *    - If FREE requested: Fallback to process.env.API_KEY (Gateway) - usually acceptable to use Paid key for Free tasks if user allows.
      */
     getKey(type: 'FREE' | 'PAID'): string {
         const pool = this.keys.filter(k => k.type === type);
         
         // 1. User Pool Hit
         if (pool.length > 0) {
-            // Rotation Logic: Pick random for now to spread load
             const selected = pool[Math.floor(Math.random() * pool.length)];
             return selected.key;
         }
 
         // 2. Fallback to Gateway/Environment
         const envKey = process.env.API_KEY;
-        // CRITICAL FIX: Ensure envKey is not just defined but non-empty
         if (envKey && envKey.trim().length > 0) {
             return envKey;
         }

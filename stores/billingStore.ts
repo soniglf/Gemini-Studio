@@ -1,8 +1,8 @@
-
 import { create } from 'zustand';
 import { UsageStats, GeneratedAsset } from '../types';
 import { db } from '../services/db';
 import { StorageService } from '../services/storageService';
+import { useTaskManagerStore } from './taskManagerStore'; // Project Apollo
 
 interface BillingState {
     stats: UsageStats;
@@ -37,9 +37,22 @@ export const useBillingStore = create<BillingState>((set, get) => ({
     },
 
     optimizeStorage: async (aggressive) => {
-        const freed = await StorageService.optimizeStorage(aggressive);
-        await get().checkStorage();
-        return freed;
+        const { addTask, updateTask, removeTask } = useTaskManagerStore.getState();
+        const taskId = `optimize-${Date.now()}`;
+        addTask({ id: taskId, name: 'Optimizing Storage...', status: 'running', progress: 0 });
+
+        try {
+            const onProgress = (p: number) => updateTask(taskId, { progress: p });
+            const freed = await StorageService.optimizeStorage(aggressive, onProgress);
+            await get().checkStorage();
+            updateTask(taskId, { status: 'completed', message: `Freed ${(freed / 1024 / 1024).toFixed(2)} MB.` });
+            setTimeout(() => removeTask(taskId), 5000);
+            return freed;
+        } catch (e) {
+            updateTask(taskId, { status: 'failed', message: 'Optimization failed.' });
+            setTimeout(() => removeTask(taskId), 5000);
+            return 0;
+        }
     },
 
     trackUsage: (asset) => {

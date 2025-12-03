@@ -1,28 +1,33 @@
-
-import React, { memo, useState, useRef, useEffect } from 'react';
+import React, { memo, useRef, useEffect } from 'react';
 import { Button, TextArea, Card, Input, BiometricSlider } from '../../components/UI';
-import { Sparkles, Play, CheckCircle, Loader2, AlertCircle, Clapperboard, UserCheck, Lightbulb, ChevronDown, Sliders, ArrowRight, RotateCcw, XCircle, RefreshCw, MessageSquare, Trash2, Edit2, Check, Plus, ClipboardCheck, BarChart, Flame } from 'lucide-react';
+import { Sparkles, Play, CheckCircle, Loader2, AlertCircle, Clapperboard, UserCheck, Lightbulb, ChevronDown, Sliders, RotateCcw, XCircle, RefreshCw, MessageSquare, Trash2, Edit2, Check, Plus, Flame } from 'lucide-react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useDirectorStore } from '../../stores/directorStore';
 import { useModelStore } from '../../stores/modelStore';
 import { useGenerationStore } from '../../stores/generationStore';
 import { useUIStore } from '../../stores/uiStore';
 import { AppMode, DirectorShot } from '../../types';
+import { AuditPanel } from '../director/AuditPanel';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export const DirectorWorkspace = memo(() => {
-    const { brief, setBrief, plan, isPlanning, isShooting, createPlan, executePlan, castModel, setCastModel, suggestBrief, regenerateShot, updateShot, deleteShot, addShot, runAudit, auditReport, isAuditing, intensity, setIntensity } = useDirectorStore();
+    const { 
+        brief, setBrief, plan, isPlanning, isShooting, createPlan, executePlan, 
+        castModel, setCastModel, suggestBrief, updateShot, deleteShot, addShot, 
+        runAudit, auditReport, isAuditing, intensity, setIntensity,
+        editingShotId, rejectingShotId, feedbackText,
+        startEditing, cancelEditing, startRejection, cancelRejection, setFeedbackText, submitRejection
+    } = useDirectorStore();
     const { savedModels } = useModelStore();
     const { hydrateFromDirector } = useGenerationStore();
     const { setMode, addToast } = useUIStore();
     const { t } = useTranslation();
     
-    const [isCastingOpen, setIsCastingOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'PLAN' | 'AUDIT'>('PLAN');
+    const [isCastingOpen, setIsCastingOpen] = React.useState(false);
+    const [activeTab, setActiveTab] = React.useState<'PLAN' | 'AUDIT'>('PLAN');
     const castingRef = useRef<HTMLDivElement>(null);
-    
-    const [rejectingShotId, setRejectingShotId] = useState<string | null>(null);
-    const [feedbackText, setFeedbackText] = useState("");
-    const [editingShotId, setEditingShotId] = useState<string | null>(null);
+
+    useKeyboardShortcuts({ onGenerate: executePlan }); // Project Sentinel
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -39,17 +44,9 @@ export const DirectorWorkspace = memo(() => {
         addToast(`Shot loaded in ${shot.type} Mode`, 'success');
     };
 
-    const handleRejectClick = (shotId: string) => {
-        setRejectingShotId(shotId);
-        setFeedbackText("");
-    };
-
-    const confirmRejection = async () => {
-        if(rejectingShotId && feedbackText.trim()) {
-            await regenerateShot(rejectingShotId, feedbackText);
-            setRejectingShotId(null);
-            setFeedbackText("");
-        }
+    const handleAddMissingShots = (shots: string[]) => {
+        setBrief(shots.join(". "));
+        setActiveTab('PLAN');
     };
 
     const selectedName = castModel ? `${castModel.name} (${castModel.ethnicity})` : t('DIR_NEW_FACE');
@@ -72,56 +69,14 @@ export const DirectorWorkspace = memo(() => {
             </div>
 
             {activeTab === 'AUDIT' ? (
-                <div className="space-y-6 animate-in slide-in-from-right-2">
-                    <div className="bg-slate-900/40 p-6 rounded-xl border border-white/10 text-center">
-                        <ClipboardCheck size={48} className="mx-auto text-emerald-400 mb-4" />
-                        <h2 className="text-xl font-bold text-white mb-2">Campaign Intelligence</h2>
-                        <p className="text-xs text-white/50 mb-6 max-w-xs mx-auto">
-                            The Audit Agent analyzes your generated assets against your Brand Bible to find gaps and inconsistency.
-                        </p>
-                        <Button onClick={runAudit} isLoading={isAuditing} className="bg-emerald-600 hover:bg-emerald-500 mx-auto">
-                            Run Full Audit
-                        </Button>
-                    </div>
-
-                    {auditReport && (
-                        <div className="space-y-4 animate-in fade-in">
-                            <Card className="p-4 bg-slate-900/50 border-emerald-500/20">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Campaign Score</span>
-                                    <span className="text-3xl font-black text-white">{auditReport.score}/100</span>
-                                </div>
-                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-4">
-                                    <div className="bg-emerald-500 h-full" style={{ width: `${auditReport.score}%` }} />
-                                </div>
-                                <p className="text-sm text-white/80 italic">"{auditReport.analysis}"</p>
-                            </Card>
-
-                             <Card className="p-4 bg-slate-900/50">
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">Consistency Check</h3>
-                                <p className="text-sm text-white">{auditReport.consistencyCheck}</p>
-                            </Card>
-
-                            <Card className="p-4 bg-slate-900/50 border-red-500/10">
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-pink-400 mb-3">Missing Shots</h3>
-                                <ul className="space-y-2">
-                                    {auditReport.missingShots.map((shot, i) => (
-                                        <li key={i} className="flex items-start gap-2 text-xs text-white/70">
-                                            <XCircle size={14} className="text-red-400 mt-0.5 shrink-0" />
-                                            {shot}
-                                        </li>
-                                    ))}
-                                </ul>
-                                <Button onClick={() => { setBrief(auditReport.missingShots.join(". ")); setActiveTab('PLAN'); }} className="w-full mt-4 text-xs h-8" variant="secondary">
-                                    <Plus size={14}/> Add Missing Shots to Plan
-                                </Button>
-                            </Card>
-                        </div>
-                    )}
-                </div>
+                <AuditPanel 
+                    report={auditReport} 
+                    isAuditing={isAuditing} 
+                    onRunAudit={runAudit} 
+                    onAddMissing={handleAddMissingShots}
+                />
             ) : (
                 <>
-                {/* EXISTING DIRECTOR UI */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-end">
                         <div className="flex items-center gap-2 text-pink-400">
@@ -170,18 +125,9 @@ export const DirectorWorkspace = memo(() => {
                             
                             {isCastingOpen && (
                                 <div className="absolute top-[110%] left-0 w-full bg-[#0B1121] border border-white/10 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar">
-                                    <div 
-                                        onClick={() => { setCastModel(null); setIsCastingOpen(false); }}
-                                        className="p-2 text-sm text-white hover:bg-white/10 cursor-pointer border-b border-white/5"
-                                    >
-                                        {t('DIR_NEW_FACE')}
-                                    </div>
+                                    <div onClick={() => { setCastModel(null); setIsCastingOpen(false); }} className="p-2 text-sm text-white hover:bg-white/10 cursor-pointer border-b border-white/5">{t('DIR_NEW_FACE')}</div>
                                     {savedModels.map(m => (
-                                        <div 
-                                            key={m.id}
-                                            onClick={() => { setCastModel(m); setIsCastingOpen(false); }}
-                                            className="p-2 text-sm text-white hover:bg-white/10 cursor-pointer"
-                                        >
+                                        <div key={m.id} onClick={() => { setCastModel(m); setIsCastingOpen(false); }} className="p-2 text-sm text-white hover:bg-white/10 cursor-pointer">
                                             {m.name} <span className="text-white/40 text-xs">({m.ethnicity})</span>
                                         </div>
                                     ))}
@@ -205,7 +151,7 @@ export const DirectorWorkspace = memo(() => {
                                 <p className="text-xs text-white/50">Model: {plan.modelBrief.name} ({plan.modelBrief.ethnicity}, {plan.modelBrief.vibe})</p>
                             </div>
                             <div className="flex gap-2">
-                                 {!isShooting && plan.shots.some(s => s.status === 'PENDING') && (
+                                 {!isShooting && plan.shots.some(s => s.status === 'PENDING' || s.status === 'FAILED') && (
                                     <Button onClick={executePlan} variant="primary" className="px-6 bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-500/20">
                                         <Play size={16} className="mr-2 fill-current" /> {t('DIR_ACTION')}
                                     </Button>
@@ -219,9 +165,8 @@ export const DirectorWorkspace = memo(() => {
                         <div className="space-y-3">
                             {plan.shots.map((shot, idx) => {
                                 const isEditable = editingShotId === shot.id;
-                                
                                 return (
-                                    <Card key={shot.id} className="p-4 flex flex-col gap-4 relative overflow-hidden bg-slate-800/50 group border border-white/5 transition-all hover:border-white/10">
+                                    <Card key={shot.id} className={`p-4 flex flex-col gap-4 relative overflow-hidden bg-slate-800/50 group border transition-all ${shot.status === 'FAILED' ? 'border-red-500/30 bg-red-900/5' : 'border-white/5 hover:border-white/10'}`}>
                                         <div className="flex items-start gap-4">
                                             <div className="shrink-0 w-8 flex justify-center mt-1">
                                                 {shot.status === 'PENDING' && <div className="w-3 h-3 rounded-full bg-white/20" />}
@@ -229,7 +174,6 @@ export const DirectorWorkspace = memo(() => {
                                                 {shot.status === 'DONE' && <CheckCircle size={18} className="text-emerald-500" />}
                                                 {shot.status === 'FAILED' && <AlertCircle size={18} className="text-red-500" />}
                                             </div>
-
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <div className="flex items-center gap-2">
@@ -238,86 +182,42 @@ export const DirectorWorkspace = memo(() => {
                                                         </span>
                                                         <span className="text-xs font-bold text-white/80">{t('DIR_SCENE')} {idx + 1}</span>
                                                     </div>
-                                                    
-                                                    {!isShooting && shot.status === 'PENDING' && !isEditable && (
+                                                    {!isShooting && (shot.status === 'PENDING' || shot.status === 'FAILED') && !isEditable && (
                                                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => setEditingShotId(shot.id)} className="p-1 text-white/40 hover:text-white"><Edit2 size={12}/></button>
+                                                            <button onClick={() => startEditing(shot.id)} className="p-1 text-white/40 hover:text-white"><Edit2 size={12}/></button>
                                                             <button onClick={() => deleteShot(shot.id)} className="p-1 text-white/40 hover:text-red-400"><Trash2 size={12}/></button>
                                                         </div>
                                                     )}
                                                 </div>
-
                                                 {isEditable ? (
                                                     <div className="space-y-2 animate-in fade-in">
-                                                        <TextArea 
-                                                            label="Description" 
-                                                            value={shot.description} 
-                                                            onChange={(e) => updateShot(shot.id, { description: e.target.value })} 
-                                                            className="h-20 mb-2"
-                                                        />
-                                                        <Input 
-                                                            label="Visual Details" 
-                                                            value={shot.visualDetails} 
-                                                            onChange={(e) => updateShot(shot.id, { visualDetails: e.target.value })} 
-                                                        />
-                                                        <div className="flex justify-end">
-                                                            <Button onClick={() => setEditingShotId(null)} className="h-8 text-xs"><Check size={14} className="mr-1"/> Done</Button>
-                                                        </div>
+                                                        <TextArea label="Description" value={shot.description} onChange={(e) => updateShot(shot.id, { description: e.target.value })} className="h-20 mb-2"/>
+                                                        <Input label="Visual Details" value={shot.visualDetails} onChange={(e) => updateShot(shot.id, { visualDetails: e.target.value })} />
+                                                        <div className="flex justify-end"><Button onClick={cancelEditing} className="h-8 text-xs"><Check size={14} className="mr-1"/> Done</Button></div>
                                                     </div>
                                                 ) : (
-                                                    <>
-                                                        <p className="text-sm text-white font-medium">{shot.description}</p>
-                                                        <p className="text-[10px] text-white/40 mt-1">{shot.visualDetails}</p>
-                                                    </>
+                                                    <><p className="text-sm text-white font-medium">{shot.description}</p><p className="text-[10px] text-white/40 mt-1">{shot.visualDetails}</p></>
                                                 )}
-                                                
-                                                {shot.feedback && (
-                                                    <div className="mt-2 p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300 flex items-center gap-2">
-                                                        <MessageSquare size={10} /> Critique: "{shot.feedback}"
-                                                    </div>
-                                                )}
+                                                {shot.feedback && <div className="mt-2 p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300 flex items-center gap-2"><MessageSquare size={10} /> Critique: "{shot.feedback}"</div>}
                                             </div>
                                         </div>
-                                        
-                                        {shot.status === 'GENERATING' && (
-                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-shimmer pointer-events-none" />
-                                        )}
-
+                                        {shot.status === 'GENERATING' && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 animate-shimmer pointer-events-none" />}
                                         <div className="flex justify-end gap-2 border-t border-white/5 pt-2 mt-2">
+                                            {shot.status === 'FAILED' && !isShooting && <button onClick={() => updateShot(shot.id, { status: 'PENDING' })} className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[10px] font-bold flex items-center gap-1 transition-colors"><RefreshCw size={12}/> Reset for Retry</button>}
                                             {shot.status === 'DONE' && rejectingShotId !== shot.id && !isShooting && (
                                                 <>
-                                                    <button 
-                                                        onClick={() => handleRejectClick(shot.id)} 
-                                                        className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[10px] font-bold flex items-center gap-1 transition-colors"
-                                                    >
-                                                        <XCircle size={12}/> Reject & Regenerate
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleTune(shot)} 
-                                                        className="px-3 py-1 bg-white/5 hover:bg-white/10 text-white rounded text-[10px] font-bold flex items-center gap-1 transition-colors"
-                                                    >
-                                                        <Sliders size={12} /> Tune in {shot.type === 'STUDIO' ? 'Studio' : 'Influencer'}
-                                                    </button>
+                                                    <button onClick={() => startRejection(shot.id)} className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[10px] font-bold flex items-center gap-1 transition-colors"><XCircle size={12}/> Reject & Regenerate</button>
+                                                    <button onClick={() => handleTune(shot)} className="px-3 py-1 bg-white/5 hover:bg-white/10 text-white rounded text-[10px] font-bold flex items-center gap-1 transition-colors"><Sliders size={12} /> Tune in {shot.type === 'STUDIO' ? 'Studio' : 'Influencer'}</button>
                                                 </>
                                             )}
-
                                             {rejectingShotId === shot.id && (
                                                 <div className="w-full animate-in slide-in-from-right-2">
                                                     <div className="flex gap-2 mb-2">
-                                                        <input 
-                                                            autoFocus
-                                                            placeholder="Why is this shot rejected? (e.g. Too dark, wrong angle)"
-                                                            value={feedbackText}
-                                                            onChange={e => setFeedbackText(e.target.value)}
-                                                            className="flex-1 bg-black/50 border border-red-500/30 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-red-500"
-                                                            onKeyDown={e => e.key === 'Enter' && confirmRejection()}
-                                                        />
+                                                        <input autoFocus placeholder="Why is this shot rejected? (e.g. Too dark, wrong angle)" value={feedbackText} onChange={e => setFeedbackText(e.target.value)} className="flex-1 bg-black/50 border border-red-500/30 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-red-500" onKeyDown={e => e.key === 'Enter' && submitRejection()}/>
                                                     </div>
                                                     <div className="flex justify-end gap-2">
-                                                        <button onClick={() => setRejectingShotId(null)} className="px-3 py-1 text-white/50 hover:text-white text-[10px]">Cancel</button>
-                                                        <button onClick={confirmRejection} className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold flex items-center gap-1">
-                                                            <RefreshCw size={12}/> Regenerate
-                                                        </button>
+                                                        <button onClick={cancelRejection} className="px-3 py-1 text-white/50 hover:text-white text-[10px]">Cancel</button>
+                                                        <button onClick={submitRejection} className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold flex items-center gap-1"><RefreshCw size={12}/> Regenerate</button>
                                                     </div>
                                                 </div>
                                             )}
@@ -325,15 +225,7 @@ export const DirectorWorkspace = memo(() => {
                                     </Card>
                                 );
                             })}
-                            
-                            {!isShooting && (
-                                <button 
-                                    onClick={addShot}
-                                    className="w-full py-3 border border-dashed border-white/10 rounded-xl text-white/30 hover:text-white hover:border-pink-500/50 hover:bg-white/5 transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"
-                                >
-                                    <Plus size={14} /> Add Shot
-                                </button>
-                            )}
+                            {!isShooting && <button onClick={addShot} className="w-full py-3 border border-dashed border-white/10 rounded-xl text-white/30 hover:text-white hover:border-pink-500/50 hover:bg-white/5 transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest"><Plus size={14} /> Add Shot</button>}
                         </div>
                     </div>
                 )}

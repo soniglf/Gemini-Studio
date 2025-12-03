@@ -6,4 +6,3 @@ export { MotionWorkspace } from './workspaces/Motion';
 export { BillingWorkspace } from './workspaces/Billing';
 export { GalleryWorkspace } from './workspaces/Gallery';
 export { DirectorWorkspace } from './workspaces/Director';
-export { LiveWorkspace } from './workspaces/Live';

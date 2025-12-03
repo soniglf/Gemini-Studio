@@ -7,28 +7,23 @@ interface UIState {
     toasts: ToastMessage[];
     mobileTab: 'EDITOR' | 'PREVIEW';
     previewTab: 'ASSET' | 'BIO';
-    
-    // --- CAMBIO CRÍTICO: Añadido 'BIO' para la vista de perfil ---
     bioFocus: 'BODY' | 'FACE' | 'BIO'; 
-    
     isPro: boolean;
     isMobile: boolean;
-    isSettingsOpen: boolean;
     isPreviewCollapsed: boolean;
+    isSidebarOpen: boolean;
     
     setMode: (mode: AppMode) => void;
     addToast: (msg: string, type?: 'success'|'error'|'info'|'warning') => void;
     removeToast: (id: string) => void;
     setMobileTab: (tab: 'EDITOR' | 'PREVIEW') => void;
     setPreviewTab: (tab: 'ASSET' | 'BIO') => void;
-    
-    // Actualizada la firma de la función
     setBioFocus: (focus: 'BODY' | 'FACE' | 'BIO') => void;
-    
     togglePro: () => void;
     setIsMobile: (isMobile: boolean) => void;
-    setSettingsOpen: (open: boolean) => void;
     togglePreviewCollapse: () => void;
+    toggleSidebar: () => void;
+    setSidebarOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -36,16 +31,16 @@ export const useUIStore = create<UIState>((set) => ({
     toasts: [],
     mobileTab: 'EDITOR',
     previewTab: 'ASSET',
-    bioFocus: 'BODY', // Valor inicial por defecto
+    bioFocus: 'BODY',
     isPro: false,
     isMobile: false,
-    isSettingsOpen: false,
     isPreviewCollapsed: false,
+    isSidebarOpen: false,
 
     setMode: (mode) => set((state) => ({ 
         mode,
-        // Auto-switch preview tab based on mode, but default to ASSET for most
-        previewTab: mode === AppMode.CREATOR ? 'BIO' : 'ASSET'
+        previewTab: mode === AppMode.CREATOR ? 'BIO' : 'ASSET',
+        isSidebarOpen: false // Auto-close on mobile nav
     })),
     
     addToast: (message, type = 'info') => {
@@ -65,8 +60,9 @@ export const useUIStore = create<UIState>((set) => ({
     togglePro: () => set((state) => ({ isPro: !state.isPro })),
     
     setIsMobile: (isMobile) => set({ isMobile }),
-
-    setSettingsOpen: (open) => set({ isSettingsOpen: open }),
     
-    togglePreviewCollapse: () => set((state) => ({ isPreviewCollapsed: !state.isPreviewCollapsed }))
+    togglePreviewCollapse: () => set((state) => ({ isPreviewCollapsed: !state.isPreviewCollapsed })),
+    
+    toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+    setSidebarOpen: (open) => set({ isSidebarOpen: open })
 }));

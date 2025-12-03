@@ -1,23 +1,33 @@
 
-import React, { memo, useEffect, useState } from 'react';
-import { InfluencerSettings, GenerationTier } from '../../types';
+import React, { memo } from 'react';
+import { InfluencerSettings } from '../../types';
 import { ProControls, WorkspaceDock } from './Shared';
 import { TextArea, VisualGridSelect, DebouncedInput } from '../../components/UI';
 import { LocationSelector } from '../shared/LocationSelector';
-import { OPTIONS } from '../../data/constants';
+import { OPTIONS } from '../../data/options';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { useGenerationStore } from '../../stores/generationStore';
-import { useUIStore } from '../../stores/uiStore';
+import { useWorkspace } from '../../hooks/useWorkspace';
+import { AppMode } from '../../types';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 export const InfluencerWorkspace = memo(() => {
-    const { influencerSettings, setInfluencerSettings, generate, locationPreviews, isPreviewLoading, fetchPreviews, isGenerating } = useGenerationStore();
-    const { isPro } = useUIStore();
     const { t } = useTranslation();
-    const [tier, setTier] = useState<GenerationTier>(GenerationTier.RENDER);
+    const {
+        settings,
+        update,
+        isPro,
+        tier,
+        setTier,
+        onGenerate,
+        isGenerating,
+        locationPreviews,
+        isPreviewLoading,
+        setSettings,
+    } = useWorkspace(AppMode.INFLUENCER);
 
-    useEffect(() => { fetchPreviews(); }, [influencerSettings.location]);
+    useKeyboardShortcuts({ onGenerate }); 
 
-    const update = (field: keyof InfluencerSettings, value: any) => setInfluencerSettings({ ...influencerSettings, [field]: value });
+    const influencerSettings = settings as InfluencerSettings;
 
     const mapOptions = (opts: string[], prefix: string) => opts.map(v => ({
         value: v,
@@ -26,7 +36,7 @@ export const InfluencerWorkspace = memo(() => {
 
     return (
         <div className="space-y-4 pb-32 animate-in fade-in">
-            {isPro && <ProControls settings={influencerSettings} setSettings={setInfluencerSettings} />}
+            {isPro && <ProControls settings={influencerSettings} setSettings={setSettings} />}
 
             <DebouncedInput label={t('LBL_LOCATION')} value={influencerSettings.location} onChange={(e) => update('location', e.target.value)} />
             <LocationSelector previews={locationPreviews} selected={influencerSettings.selectedLocationPreview} onSelect={(url) => update('selectedLocationPreview', url)} isGenerating={isPreviewLoading} />
@@ -38,7 +48,7 @@ export const InfluencerWorkspace = memo(() => {
             </div>
             
             <WorkspaceDock 
-                onGenerate={() => generate(tier)}
+                onGenerate={onGenerate}
                 isGenerating={isGenerating}
                 tier={tier}
                 setTier={setTier}

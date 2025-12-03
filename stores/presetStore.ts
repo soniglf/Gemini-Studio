@@ -1,9 +1,11 @@
-
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Preset, StudioSettings, InfluencerSettings, MotionSettings } from '../types';
 
+const PRESET_STORE_VERSION = 1;
+
 interface PresetState {
+    version: number;
     presets: Preset[];
     savePreset: (name: string, mode: 'STUDIO'|'INFLUENCER'|'MOTION', settings: any) => void;
     deletePreset: (id: string) => void;
@@ -15,6 +17,7 @@ interface PresetState {
 export const usePresetStore = create<PresetState>()(
     persist(
         (set, get) => ({
+            version: PRESET_STORE_VERSION,
             presets: [],
             
             savePreset: (name, mode, settings) => {
@@ -55,6 +58,13 @@ export const usePresetStore = create<PresetState>()(
         {
             name: 'gemini-presets',
             storage: createJSONStorage(() => localStorage),
+            version: PRESET_STORE_VERSION,
+            onRehydrateStorage: (state) => {
+                if (state?.version !== PRESET_STORE_VERSION) {
+                    console.warn(`Preset store version mismatch. Expected ${PRESET_STORE_VERSION}, got ${state?.version}. Resetting.`);
+                    return; 
+                }
+            },
         }
     )
 );

@@ -1,8 +1,8 @@
-
 import { create } from 'zustand';
 import { Project } from '../types';
 import { db } from '../services/db';
 import { useUIStore } from './uiStore';
+import { useGalleryStore } from './galleryStore';
 
 interface ProjectState {
     projects: Project[];
@@ -35,10 +35,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                 await db.projects.add(def);
                 all = [def];
             }
+            const sorted = all.sort((a,b) => b.createdAt - a.createdAt);
             set({ 
-                projects: all.sort((a,b) => b.createdAt - a.createdAt),
-                activeProject: all[0] 
+                projects: sorted,
+                activeProject: sorted[0] 
             });
+            // Initial load trigger
+            if (sorted[0]) {
+                 useGalleryStore.getState().loadAssets(sorted[0].id);
+            }
         } catch (e) {
             console.error(e);
             useUIStore.getState().addToast("Failed to load campaigns", 'error');
@@ -97,3 +102,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         useUIStore.getState().addToast("Campaign deleted", 'success');
     }
 }));
+
+// --- REACTIVE ORCHESTRATION (Project Synapse 2.0) ---
+// This listener automatically loads assets when the active project changes.
+useProjectStore.subscribe(
+    (current, previous) => {
+        if (current.activeProject && current.activeProject.id !== previous.activeProject?.id) {
+            console.log(`[Synapse 2.0] Project changed to "${current.activeProject.name}". Hydrating gallery...`);
+            useGalleryStore.getState().loadAssets(current.activeProject.id);
+        }
+    }
+);

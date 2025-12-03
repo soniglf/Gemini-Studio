@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { CanvasMask } from '../../components/ui/CanvasMask';
 import { Button } from '../../components/UI';
-import { Wand2, X, Eraser, Paintbrush } from 'lucide-react';
+import { Wand2, X, Eraser, Paintbrush, Circle } from 'lucide-react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { GeneratedAsset, GenerationResult } from '../../types';
 
@@ -17,6 +17,7 @@ export const MagicEditor: React.FC<MagicEditorProps> = ({ asset, onApply, onCanc
     const [maskBlob, setMaskBlob] = useState<Blob | null>(null);
     const [prompt, setPrompt] = useState("");
     const [clearSignal, setClearSignal] = useState(0);
+    const [brushSize, setBrushSize] = useState(40);
     const containerRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
     
@@ -101,6 +102,7 @@ export const MagicEditor: React.FC<MagicEditorProps> = ({ asset, onApply, onCanc
                         originalHeight={naturalDims.h}
                         onMaskChange={setMaskBlob}
                         clearSignal={clearSignal}
+                        brushSize={brushSize}
                     />
                 </div>
             )}
@@ -117,9 +119,28 @@ export const MagicEditor: React.FC<MagicEditorProps> = ({ asset, onApply, onCanc
             <div className="absolute bottom-0 left-0 right-0 bg-[#030712]/90 backdrop-blur-xl border-t border-white/10 p-4 z-[60] flex flex-col gap-3 animate-in slide-in-from-bottom-2">
                 <div className="flex items-center justify-between text-pink-400 px-1">
                     <span className="text-[10px] font-bold uppercase tracking-widest">{t('EDT_INSTRUCTION')}</span>
-                    <button onClick={() => setClearSignal(p => p+1)} className="text-[10px] hover:text-white transition-colors flex items-center gap-1">
-                        <Eraser size={12}/> {t('EDT_CLEAR')}
-                    </button>
+                    <div className="flex items-center gap-4">
+                        {/* Brush Size Slider */}
+                        <div className="flex items-center gap-2 group/slider">
+                            <Circle size={8} className="text-white/50 group-hover/slider:text-white transition-colors" />
+                            <input 
+                                type="range" 
+                                min="5" max="100" 
+                                value={brushSize} 
+                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                                className="w-24 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-pink-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:hover:scale-125 transition-all"
+                                title="Brush Size"
+                            />
+                            <Circle size={14} className="text-white/50 group-hover/slider:text-white transition-colors" />
+                            <span className="text-[9px] font-mono text-white/50 w-6 text-right">{brushSize}px</span>
+                        </div>
+
+                        <div className="h-4 w-px bg-white/10"></div>
+
+                        <button onClick={() => setClearSignal(p => p+1)} className="text-[10px] hover:text-white transition-colors flex items-center gap-1 text-white/50">
+                            <Eraser size={12}/> {t('EDT_CLEAR')}
+                        </button>
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     <input 

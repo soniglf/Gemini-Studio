@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react';
 import { GeneratedAsset, AppMode, GenerationResult } from '../types';
 import { useGenerationStore } from '../stores/generationStore';
-import { useDirectorStore } from '../stores/directorStore';
 import { useGalleryStore } from '../stores/galleryStore';
 import { useModelStore } from '../stores/modelStore';
 import { PngMetadataService } from '../services/utils/pngMetadata';
-import { refineSettings } from '../services/geminiService';
+import { GenerationService } from '../services/ai/generationService';
 import { useUIStore } from '../stores/uiStore';
+import { useStudioSettingsStore } from '../stores/studioSettingsStore';
+import { useInfluencerSettingsStore } from '../stores/influencerSettingsStore';
+import { useMotionSettingsStore } from '../stores/motionSettingsStore';
 
 export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => void) => {
     const [showPrompt, setShowPrompt] = useState(false);
@@ -16,24 +18,21 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     const [compareMode, setCompareMode] = useState(false);
     const [isRefining, setIsRefining] = useState(false);
     
-    const { isGenerating, lastGenerated, edit, restoreState, refine, applyRefinement, studioSettings, influencerSettings, motionSettings, setStudioSettings, setInfluencerSettings, setMotionSettings } = useGenerationStore();
-    const { isShooting } = useDirectorStore();
+    const { isGenerating, lastGenerated, edit, restoreState, refine, applyRefinement } = useGenerationStore();
     const { assets } = useGalleryStore();
     const { updateReferenceImage, model } = useModelStore();
     const { mode, addToast } = useUIStore();
 
     const activeData = lastGenerated || (assets && assets[0] ? assets[0] : null);
     
-    // Accessors for union types
     const activePrompt = (activeData as GeneratedAsset)?.prompt || (activeData as GenerationResult)?.finalPrompt;
     const activeId = (activeData as GeneratedAsset)?.id;
     
-    // Find previous version if this is a refinement/edit for Comparison
     const previousVersion = activeData && activePrompt?.startsWith('REFINED:') 
         ? assets.find(a => activePrompt.includes(a.prompt) && a.id !== activeId) 
         : null;
 
-    const isLoading = isGenerating || isShooting;
+    const isLoading = isGenerating;
 
     useEffect(() => {
         setIsEditing(false);
@@ -56,7 +55,6 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
 
     const handleDownload = async () => {
         if (!activeData?.blob) return;
-        // Inject DNA
         const blobWithDNA = await PngMetadataService.injectMetadata(activeData.blob, activeData);
         const url = URL.createObjectURL(blobWithDNA);
         const a = document.createElement('a');
@@ -81,7 +79,7 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     };
 
     const handleRestore = () => {
-        if (activeData) restoreState(activeData);
+        if (activeData) restoreState(activeData as GeneratedAsset);
     };
 
     const handleRefine = () => {
@@ -92,10 +90,7 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
         if (activeData?.url && model) {
             if(confirm(`Update ${model.name}'s official face reference to this image?`)) {
                 try {
-                    // ROBUST FIX: Convert Blob/URL to persistent Base64 Data URI
-                    // This prevents "blob:..." URLs from being saved to IDB (which expire on refresh)
                     let blob: Blob;
-                    
                     if (activeData.blob) {
                         blob = activeData.blob;
                     } else {
@@ -122,15 +117,15 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
         setIsRefining(true);
         try {
             let currentSettings: any;
-            if (mode === AppMode.STUDIO) currentSettings = studioSettings;
-            else if (mode === AppMode.INFLUENCER) currentSettings = influencerSettings;
-            else if (mode === AppMode.MOTION) currentSettings = motionSettings;
+            if (mode === AppMode.STUDIO) currentSettings = useStudioSettingsStore.getState().settings;
+            else if (mode === AppMode.INFLUENCER) currentSettings = useInfluencerSettingsStore.getState().settings;
+            else if (mode === AppMode.MOTION) currentSettings = useMotionSettingsStore.getState().settings;
             else {
                 setIsRefining(false);
                 return;
             }
 
-            const updates = await refineSettings(currentSettings, instruction, mode);
+            const updates = await GenerationService.refineSettings(currentSettings, instruction, mode);
             applyRefinement(updates);
         } catch(e) {
             console.error(e);
@@ -149,7 +144,6 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     const isVideo = activeData?.url?.startsWith('data:video') || activeData?.blob?.type?.includes('video');
 
     return {
-        // State
         activeData,
         assets,
         isLoading,
@@ -160,8 +154,6 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
         previousVersion,
         isVideo,
         isRefining,
-
-        // Actions
         handleShare,
         handleDownload,
         copyPrompt,

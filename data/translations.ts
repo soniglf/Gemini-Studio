@@ -1,5 +1,6 @@
 
 
+
 export const TRANSLATIONS = {
     EN: {
         // Navigation (Strictly Matching AppMode)
@@ -8,7 +9,6 @@ export const TRANSLATIONS = {
         NAV_STUDIO: "Studio",
         NAV_INFLUENCER: "Influencer",
         NAV_MOTION: "Motion",
-        NAV_LIVE: "Live Session",
         NAV_GALLERY: "Vault",
         NAV_BILLING: "Stats",
         
@@ -196,7 +196,7 @@ export const TRANSLATIONS = {
         // Face Features
         OPT_FACE_OVAL: "Oval", OPT_FACE_SQUARE: "Square", OPT_FACE_HEART: "Heart", OPT_FACE_DIAMOND: "Diamond", OPT_FACE_ROUND: "Round", OPT_FACE_LONG: "Long",
         OPT_SKIN_PORCELAIN: "Porcelain", OPT_SKIN_FAIR: "Fair", OPT_SKIN_TAN: "Tan", OPT_SKIN_OLIVE: "Olive", OPT_SKIN_BROWN: "Brown", OPT_SKIN_DARK_BROWN: "Dark Brown", OPT_SKIN_DEEP_EBONY: "Deep Ebony",
-        OPT_EYE_ALMOND: "Almond", OPT_EYE_ROUND: "Round", OPT_EYE_HOODED: "Hooded", OPT_EYE_MONOLID: "Monolid", OPT_EYE_DOWNTURNED: "Downturned",
+        OPT_EYE_ALMOND: "Almond", OPT_EYE_ROUND: "Round", OPT_EYE_HOODED: "Hooded", OPT_EYE_MONOLID: "Monolido", OPT_EYE_DOWNTURNED: "Downturned",
         OPT_NOSE_STRAIGHT: "Straight", OPT_NOSE_BUTTON: "Button", OPT_NOSE_ROMAN: "Roman", OPT_NOSE_UPTURNED: "Upturned", OPT_NOSE_NUBIAN: "Nubian", OPT_NOSE_HAWK: "Hawk",
         OPT_LIP_FULL: "Full", OPT_LIP_THIN: "Thin", OPT_LIP_BOW_SHAPED: "Bow-shaped", OPT_LIP_HEAVY_LOWER: "Heavy Lower", OPT_LIP_HEAVY_UPPER: "Heavy Upper",
         OPT_MAKEUP_NO_MAKEUP: "No Makeup", OPT_MAKEUP_NATURAL_GLOW: "Natural Glow", OPT_MAKEUP_SOFT_GLAM: "Soft Glam", OPT_MAKEUP_HEAVY_GLAM: "Heavy Glam", OPT_MAKEUP_GOTH: "Goth",
@@ -216,7 +216,6 @@ export const TRANSLATIONS = {
         NAV_STUDIO: "Estudio",
         NAV_INFLUENCER: "Influencer",
         NAV_MOTION: "Video",
-        NAV_LIVE: "Sesión en Vivo",
         NAV_GALLERY: "Galería",
         NAV_BILLING: "Estadísticas",
         

@@ -1,9 +1,8 @@
 
+import { useGalleryStore } from '../stores/galleryStore';
+
 /**
- * REMOVED
- * This hook has been deleted as part of the Q3 Code Cleanliness Directive.
- * Please use stores/galleryStore.ts
+ * Hook Alias: Provides access to the Gallery Store.
+ * Restored for modular access and backward compatibility.
  */
-export const useGallery = () => {
-    throw new Error("useGallery is removed. Use useGalleryStore.");
-};
+export const useGallery = useGalleryStore;

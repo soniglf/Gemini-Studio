@@ -9,7 +9,13 @@ interface ShortcutHandlers {
 export const useKeyboardShortcuts = (handlers: ShortcutHandlers) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Support both Mac (Meta) and Windows/Linux (Ctrl)
+      const target = e.target as HTMLElement;
+
+      // [Project Sentinel] Context-aware check: Do not fire shortcuts if the user is typing.
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) {
+          return;
+      }
+      
       const cmdOrCtrl = e.metaKey || e.ctrlKey;
       
       // Trigger Generate: Cmd+Enter or Ctrl+Enter
