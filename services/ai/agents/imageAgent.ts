@@ -7,6 +7,15 @@ import { ModelAttributes, StudioSettings, InfluencerSettings, GenerationResult, 
 export class ImageAgent {
     
     // --- BUILDER METHODS ---
+
+    static async buildCreatorPrompt(model: ModelAttributes): Promise<string> {
+        // This is the "Source of Truth" generator
+        return new PromptBuilder()
+            .withModel(model)
+            .withTurnaroundSheet()
+            .withTechSpecs({}, 'STUDIO', false) // Default neutral tech specs
+            .build();
+    }
     
     static async buildStudioPrompt(model: ModelAttributes, settings: StudioSettings, projectContext?: string): Promise<string> {
         const isComplexBackground = settings.background.length > 20 || settings.background.includes(' ');
@@ -58,12 +67,18 @@ export class ImageAgent {
         const finalPrompt = await ImageAgent.buildStudioPrompt(model, settings, projectContext);
         
         const images: Record<string, string> = {};
-        if (model.referenceImages && model.referenceImages.length > 0) {
-            model.referenceImages.forEach((ref, index) => images[`face_${index}`] = ref);
-        } else if (model.referenceImage) {
-             images['face'] = model.referenceImage;
+        
+        // Strictness Logic: If strictness > 0, we pass the face references.
+        // If strictness is very high (100%), we pass up to 5 images for maximum fidelity.
+        if (model.strictness > 0) {
+            if (model.referenceImages && model.referenceImages.length > 0) {
+                 const refLimit = model.strictness >= 100 ? 5 : 3;
+                 model.referenceImages.slice(0, refLimit).forEach((ref, i) => images[`ref_${i}`] = ref);
+            } else if (model.referenceImage) {
+                images['face'] = model.referenceImage;
+            }
         }
-        if (model.accessoriesImage) images['accessories'] = model.accessoriesImage;
+        
         if (settings.outfitImage) images['outfit'] = settings.outfitImage;
         if (settings.productImage) images['product'] = settings.productImage;
         if (settings.selectedLocationPreview) images['background_ref'] = settings.selectedLocationPreview;
@@ -91,11 +106,17 @@ export class ImageAgent {
         const finalPrompt = await ImageAgent.buildInfluencerPrompt(model, settings, projectContext);
 
         const images: Record<string, string> = {};
-        if (model.referenceImages && model.referenceImages.length > 0) {
-            model.referenceImages.forEach((ref, index) => images[`face_${index}`] = ref);
-        } else if (model.referenceImage) {
-             images['face'] = model.referenceImage;
+        
+        // Strictness Logic
+        if (model.strictness > 0) {
+            if (model.referenceImages && model.referenceImages.length > 0) {
+                const refLimit = model.strictness >= 100 ? 5 : 3;
+                model.referenceImages.slice(0, refLimit).forEach((ref, i) => images[`ref_${i}`] = ref);
+            } else if (model.referenceImage) {
+                images['face'] = model.referenceImage;
+            }
         }
+        
         if (settings.outfitImage) images['outfit'] = settings.outfitImage;
         if (settings.selectedLocationPreview) images['location_ref'] = settings.selectedLocationPreview;
 

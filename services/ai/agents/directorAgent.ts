@@ -26,15 +26,31 @@ export class DirectorAgent {
         return `A ${mood} ${genre} campaign featuring ${subject} ${setting}. Shot ${camera}. Lighting should be ${light}.`;
     }
 
-    static mapShotToSettings(shot: DirectorShot, baseVibe: string, projectContext?: string): { settings: StudioSettings | InfluencerSettings, mode: 'STUDIO' | 'INFLUENCER' } {
+    static mapShotToSettings(shot: DirectorShot, baseVibe: string, intensity: number = 50, projectContext?: string): { settings: StudioSettings | InfluencerSettings, mode: 'STUDIO' | 'INFLUENCER' } {
+        // --- INTENSITY LOGIC ---
+        // Dynamically adjust parameters based on the Drama Slider (0-100)
+        let vibeModifier = baseVibe;
+        let lightingOverride = "";
+        let contrastOverride = "";
+        
+        if (intensity >= 80) {
+            vibeModifier = `${baseVibe}, High Fashion, Edgy, Avant Garde, Provocative`;
+            lightingOverride = "Hard Flash";
+            contrastOverride = "High Contrast";
+        } else if (intensity <= 30) {
+            vibeModifier = `${baseVibe}, Candid, Natural, Soft, Authentic`;
+            lightingOverride = "Natural Window";
+            contrastOverride = "Soft";
+        }
+
         if (shot.type === 'STUDIO') {
             const settings: StudioSettings = {
                 ...INITIAL_STUDIO,
                 productDescription: shot.description, 
                 background: shot.visualDetails, 
-                lightingSetup: "Softbox", 
-                editorialVibe: baseVibe,
-                isHighFashion: true, 
+                lightingSetup: lightingOverride || "Softbox", 
+                editorialVibe: vibeModifier,
+                isHighFashion: intensity > 60, // Auto-enable High Fashion mode
                 aspectRatio: "3:4",
                 useMagicPrompt: true
             };
@@ -43,7 +59,7 @@ export class DirectorAgent {
             const settings: InfluencerSettings = {
                 ...INITIAL_INFLUENCER,
                 action: shot.description,
-                vibe: baseVibe,
+                vibe: vibeModifier,
                 location: shot.visualDetails,
                 aspectRatio: "4:5",
                 useMagicPrompt: true

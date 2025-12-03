@@ -8,14 +8,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Rajdhani:wght@500;600;700&family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <style>
       :root {
-        --neon-primary: #ec4899;
-        --neon-secondary: #8b5cf6;
-        --glass-surface: rgba(5, 5, 10, 0.6); /* Darker glass */
-        --glass-border: rgba(255, 255, 255, 0.05);
+        --neon-primary: #ec4899; /* Default Pink */
+        --neon-secondary: #8b5cf6; /* Default Purple */
+        --glass-surface: rgba(15, 23, 42, 0.85);
+        --glass-border: rgba(255, 255, 255, 0.1);
       }
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #000000; /* Pure Black */
+        background-color: #020617;
         color: #e2e8f0;
         overflow: hidden; 
         position: relative;
@@ -27,7 +27,7 @@
         font-family: 'Orbitron', sans-serif;
       }
       
-      /* Nebula Background - VOID STYLE (Darker/Subtler) */
+      /* Nebula Background - REACTIVE ATMOSPHERE */
       .nebula-bg {
         position: fixed;
         top: 0;
@@ -36,24 +36,38 @@
         height: 100vh;
         z-index: 0;
         background: 
-          radial-gradient(circle at 15% 50%, rgba(20, 0, 40, 0.4), transparent 50%),
-          radial-gradient(circle at 85% 30%, rgba(40, 0, 20, 0.3), transparent 50%),
-          radial-gradient(circle at 50% 90%, rgba(0, 20, 30, 0.2), transparent 60%);
-        filter: blur(80px);
-        opacity: 0.4; /* Significantly reduced opacity */
+          radial-gradient(circle at 15% 50%, var(--neon-secondary), transparent 50%),
+          radial-gradient(circle at 85% 30%, var(--neon-primary), transparent 50%),
+          radial-gradient(circle at 50% 90%, #0f172a, transparent 60%);
+        filter: blur(100px);
+        opacity: 0.15; 
+        transition: background 1.5s ease-in-out; /* Smooth color transitions */
         animation: pulseNebula 15s infinite alternate;
         pointer-events: none;
+      }
+
+      /* CINEMATIC FILM GRAIN */
+      .noise-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.03;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
       }
 
       .grid-overlay {
         position: fixed;
         inset: 0;
         background-image: 
-          linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
         background-size: 60px 60px;
         z-index: 0;
-        mask-image: radial-gradient(circle at center, black 30%, transparent 90%);
+        mask-image: radial-gradient(circle at center, black 40%, transparent 95%);
         pointer-events: none;
       }
 
@@ -64,42 +78,56 @@
       }
 
       @keyframes pulseNebula {
-        0% { opacity: 0.3; transform: scale(1); }
-        100% { opacity: 0.5; transform: scale(1.05); }
+        0% { opacity: 0.15; transform: scale(1); }
+        100% { opacity: 0.25; transform: scale(1.05); }
       }
       
       /* Utilities */
       .glass-panel {
         background: var(--glass-surface);
-        backdrop-filter: blur(30px);
-        -webkit-backdrop-filter: blur(30px);
+        backdrop-filter: blur(40px);
+        -webkit-backdrop-filter: blur(40px);
         border: 1px solid var(--glass-border);
       }
 
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
+      /* Custom Scrollbar - Visible & Sleek */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
       }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+      /* Fallback for Firefox */
+      .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
       }
       
+      /* Slider base style - JS overrides colors */
       input[type="range"]::-webkit-slider-thumb {
         -webkit-appearance: none;
         height: 14px;
         width: 14px;
         border-radius: 50%;
-        background: #ec4899;
+        background: var(--neon-primary);
         cursor: pointer;
-        box-shadow: 0 0 10px #ec4899;
+        box-shadow: 0 0 10px var(--neon-primary);
         margin-top: -5px;
-        border: 2px solid #000;
+        border: 2px solid #020617;
       }
       input[type="range"]::-webkit-slider-runnable-track {
         width: 100%;
         height: 4px;
         cursor: pointer;
-        background: rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.15);
         border-radius: 2px;
       }
     </style>
@@ -123,6 +151,7 @@
 </head>
   <body>
     <div class="nebula-bg"></div>
+    <div class="noise-overlay"></div>
     <div class="grid-overlay"></div>
     <div id="root"></div>
   </body>

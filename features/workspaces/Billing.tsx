@@ -6,9 +6,11 @@ import { ShieldCheck, CreditCard, Activity, HardDrive, Archive, Server, Lock, Ke
 import { KeyVault, KeyHealth } from '../../services/ai/keyVault';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useBillingStore } from '../../stores/billingStore';
+import { useUIStore } from '../../stores/uiStore';
 
 export const BillingWorkspace = memo(() => {
     const { stats, optimizeStorage, checkStorage } = useBillingStore();
+    const { addToast } = useUIStore();
     const [health, setHealth] = useState<KeyHealth | null>(null);
     const [isOptimizing, setIsOptimizing] = useState(false);
     
@@ -36,8 +38,9 @@ export const BillingWorkspace = memo(() => {
             KeyVault.addKey(newKey, keyType);
             setNewKey("");
             refreshHealth();
+            addToast(`Secure Key Added (${keyType})`, 'success');
         } catch (e: any) {
-            alert(e.message);
+            addToast(e.message, 'error');
         }
     };
 
@@ -45,6 +48,7 @@ export const BillingWorkspace = memo(() => {
         if(confirm("Remove this key?")) {
             KeyVault.removeKey(id);
             refreshHealth();
+            addToast("Key removed", 'info');
         }
     };
 
@@ -52,7 +56,7 @@ export const BillingWorkspace = memo(() => {
         if(!confirm("Smart Archive:\n- Compresses 'Sketch' images to JPEG\n- Preserves 'Render' images\n- Frees up browser storage\n\nProceed?")) return;
         setIsOptimizing(true);
         const freed = await optimizeStorage(false); // SAFE mode
-        alert(`Archival Complete. Freed ${(freed / 1024 / 1024).toFixed(2)} MB.`);
+        addToast(`Archival Complete. Freed ${(freed / 1024 / 1024).toFixed(2)} MB.`, 'success');
         setIsOptimizing(false);
     };
 

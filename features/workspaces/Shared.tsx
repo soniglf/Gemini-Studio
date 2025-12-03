@@ -2,7 +2,7 @@
 import React, { memo, useState } from 'react';
 import { StudioSettings, InfluencerSettings, MotionSettings, GenerationTier, ModelAttributes } from '../../types';
 import { VisualGridSelect, TextArea, Input } from '../../components/UI';
-import { Aperture, Lock, Unlock, Settings, ChevronDown, CheckSquare, Square, Save, Bookmark, Trash2, Undo2, Redo2, Eye, EyeOff, Share2, Dices } from 'lucide-react';
+import { Aperture, Lock, Unlock, Settings, ChevronDown, CheckSquare, Square, Save, Bookmark, Trash2, Undo2, Redo2, Eye, EyeOff, Share2, Dices, Zap, Layers, DollarSign, Activity } from 'lucide-react';
 import { OPTIONS } from '../../data/constants';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useGenerationStore } from '../../stores/generationStore';
@@ -283,6 +283,66 @@ export const ProControls = memo(({ settings, setSettings, isVideo = false }: Pro
                     />
                 </div>
             )}
+        </div>
+    );
+});
+
+// --- THE OMNI-DOCK ---
+export const WorkspaceDock = memo(({ onGenerate, isGenerating, tier, setTier, isVideo = false }: { onGenerate: () => void, isGenerating: boolean, tier: GenerationTier, setTier: (t: GenerationTier) => void, isVideo?: boolean }) => {
+    
+    const cost = tier === GenerationTier.SKETCH ? 0 : (isVideo ? 0.20 : 0.04);
+    const label = tier === GenerationTier.SKETCH ? (isVideo ? 'Turbo Preview' : 'Flash Sketch') : (isVideo ? 'Pro Render' : 'High Fidelity');
+
+    return (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl bg-[#020617]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-2 z-50 flex items-center shadow-2xl shadow-black/50 ring-1 ring-white/5 animate-in slide-in-from-bottom-4">
+            
+            {/* Status Module */}
+            <div className="hidden sm:flex flex-col justify-center px-4 border-r border-white/10 min-w-[100px]">
+                <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Est. Cost</span>
+                <span className={`text-xs font-bold font-mono flex items-center gap-1 ${cost > 0 ? 'text-pink-400' : 'text-emerald-400'}`}>
+                    <DollarSign size={10}/> {cost.toFixed(2)}
+                </span>
+            </div>
+
+            {/* Tier Selector Switch */}
+            <div className="flex-1 px-4 flex justify-center">
+                <div className="flex bg-black/40 rounded-lg p-1 border border-white/5 relative">
+                    <button 
+                        onClick={() => setTier(GenerationTier.SKETCH)}
+                        className={`relative z-10 px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all duration-300 ${tier === GenerationTier.SKETCH ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                    >
+                        {isVideo ? 'Fast' : 'Sketch'}
+                    </button>
+                    <button 
+                        onClick={() => setTier(GenerationTier.RENDER)}
+                        className={`relative z-10 px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all duration-300 ${tier === GenerationTier.RENDER ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                    >
+                        {isVideo ? 'Pro' : 'Render'}
+                    </button>
+                    
+                    {/* Sliding Background */}
+                    <div 
+                        className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white/10 rounded-md transition-transform duration-300 ease-out border border-white/10 ${tier === GenerationTier.RENDER ? 'translate-x-full' : 'translate-x-0'}`}
+                    />
+                </div>
+            </div>
+
+            {/* Main Trigger */}
+            <div className="pl-2">
+                <button 
+                    onClick={onGenerate}
+                    disabled={isGenerating}
+                    className={`h-12 px-6 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center gap-2 shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 ${isGenerating 
+                        ? 'bg-slate-800 text-white/50 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white shadow-pink-500/20'}`}
+                >
+                    {isGenerating ? (
+                        <>Processing <Activity size={16} className="animate-spin"/></>
+                    ) : (
+                        <>{label} <Zap size={16} className="fill-current"/></>
+                    )}
+                </button>
+            </div>
         </div>
     );
 });

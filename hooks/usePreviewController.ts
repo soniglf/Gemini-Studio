@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { GeneratedAsset, AppMode, GenerationResult } from '../types';
 import { useGenerationStore } from '../stores/generationStore';
@@ -19,7 +20,7 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
     const { isShooting } = useDirectorStore();
     const { assets } = useGalleryStore();
     const { updateReferenceImage, model } = useModelStore();
-    const { mode } = useUIStore();
+    const { mode, addToast } = useUIStore();
 
     const activeData = lastGenerated || (assets && assets[0] ? assets[0] : null);
     
@@ -87,10 +88,32 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
         if (activeData && 'id' in activeData) refine(activeData as GeneratedAsset);
     };
 
-    const handleSetReference = () => {
+    const handleSetReference = async () => {
         if (activeData?.url && model) {
             if(confirm(`Update ${model.name}'s official face reference to this image?`)) {
-                updateReferenceImage(activeData.url);
+                try {
+                    // ROBUST FIX: Convert Blob/URL to persistent Base64 Data URI
+                    // This prevents "blob:..." URLs from being saved to IDB (which expire on refresh)
+                    let blob: Blob;
+                    
+                    if (activeData.blob) {
+                        blob = activeData.blob;
+                    } else {
+                        const response = await fetch(activeData.url);
+                        blob = await response.blob();
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64 = reader.result as string;
+                        updateReferenceImage(base64);
+                    };
+                    reader.onerror = () => addToast("Failed to process image data", 'error');
+                    reader.readAsDataURL(blob);
+                } catch (e) {
+                    console.error("Set Reference Failed", e);
+                    addToast("Failed to set reference", 'error');
+                }
             }
         }
     };
@@ -118,8 +141,8 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
 
     const handleSeedReuse = () => {
         const settings = (activeData as GeneratedAsset)?.settings;
-        if (settings?.seed) {
-            applyRefinement({ seed: settings.seed });
+        if (settings && 'seed' in settings && (settings as any).seed !== undefined) {
+            applyRefinement({ seed: (settings as any).seed });
         }
     };
 

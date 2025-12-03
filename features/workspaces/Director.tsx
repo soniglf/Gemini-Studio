@@ -1,7 +1,7 @@
 
 import React, { memo, useState, useRef, useEffect } from 'react';
-import { Button, TextArea, Card, Input } from '../../components/UI';
-import { Sparkles, Play, CheckCircle, Loader2, AlertCircle, Clapperboard, UserCheck, Lightbulb, ChevronDown, Sliders, ArrowRight, RotateCcw, XCircle, RefreshCw, MessageSquare, Trash2, Edit2, Check, Plus, ClipboardCheck, BarChart } from 'lucide-react';
+import { Button, TextArea, Card, Input, BiometricSlider } from '../../components/UI';
+import { Sparkles, Play, CheckCircle, Loader2, AlertCircle, Clapperboard, UserCheck, Lightbulb, ChevronDown, Sliders, ArrowRight, RotateCcw, XCircle, RefreshCw, MessageSquare, Trash2, Edit2, Check, Plus, ClipboardCheck, BarChart, Flame } from 'lucide-react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useDirectorStore } from '../../stores/directorStore';
 import { useModelStore } from '../../stores/modelStore';
@@ -10,7 +10,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { AppMode, DirectorShot } from '../../types';
 
 export const DirectorWorkspace = memo(() => {
-    const { brief, setBrief, plan, isPlanning, isShooting, createPlan, executePlan, castModel, setCastModel, suggestBrief, regenerateShot, updateShot, deleteShot, addShot, runAudit, auditReport, isAuditing } = useDirectorStore();
+    const { brief, setBrief, plan, isPlanning, isShooting, createPlan, executePlan, castModel, setCastModel, suggestBrief, regenerateShot, updateShot, deleteShot, addShot, runAudit, auditReport, isAuditing, intensity, setIntensity } = useDirectorStore();
     const { savedModels } = useModelStore();
     const { hydrateFromDirector } = useGenerationStore();
     const { setMode, addToast } = useUIStore();
@@ -140,6 +140,20 @@ export const DirectorWorkspace = memo(() => {
                         placeholder={t('DIR_PLACEHOLDER')}
                         disabled={isPlanning || isShooting}
                     />
+
+                    <div className="bg-slate-900/40 p-4 rounded-xl border border-white/10 space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Flame size={14} className="text-orange-400" />
+                            <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Cinematic Intensity</span>
+                        </div>
+                        <BiometricSlider 
+                            label={`Drama Level: ${intensity}%`} 
+                            value={intensity} 
+                            onChange={setIntensity}
+                            leftLabel="Natural / Candid"
+                            rightLabel="Edgy / High Fashion"
+                        />
+                    </div>
 
                     <div className="bg-slate-900/40 p-3 rounded-lg border border-white/10 flex items-center gap-3" ref={castingRef}>
                         <UserCheck className="text-purple-400" size={20} />

@@ -14,6 +14,7 @@ import { useBillingStore } from './billingStore';
 interface DirectorState {
     plan: DirectorPlan | null;
     brief: string;
+    intensity: number; // 0-100 Cinematic Intensity
     isPlanning: boolean;
     isShooting: boolean;
     castModel: ModelAttributes | null;
@@ -21,6 +22,7 @@ interface DirectorState {
     isAuditing: boolean;
 
     setBrief: (s: string) => void;
+    setIntensity: (n: number) => void;
     setCastModel: (m: ModelAttributes | null) => void;
     setPlan: (p: DirectorPlan | null) => void;
     suggestBrief: () => void;
@@ -59,6 +61,7 @@ export const useDirectorStore = create<DirectorState>()(
         (set, get) => ({
             plan: null,
             brief: "",
+            intensity: 50,
             isPlanning: false,
             isShooting: false,
             castModel: null,
@@ -66,6 +69,7 @@ export const useDirectorStore = create<DirectorState>()(
             isAuditing: false,
 
             setBrief: (brief) => set({ brief }),
+            setIntensity: (intensity) => set({ intensity }),
             setCastModel: (castModel) => set({ castModel }),
             setPlan: (plan) => set({ plan }),
 
@@ -88,7 +92,7 @@ export const useDirectorStore = create<DirectorState>()(
             },
 
             executePlan: async () => {
-                const { plan, castModel } = get();
+                const { plan, castModel, intensity } = get();
                 const { activeProject } = useProjectStore.getState();
                 
                 if (!plan || !activeProject) return;
@@ -118,7 +122,7 @@ export const useDirectorStore = create<DirectorState>()(
                     }));
 
                     try {
-                        await executeSingleShot(shot, campaignModel, activeProject.id, activeProject.customInstructions);
+                        await executeSingleShot(shot, campaignModel, activeProject.id, intensity, activeProject.customInstructions);
                         
                         set(state => ({ 
                             plan: state.plan ? { 
@@ -160,7 +164,7 @@ export const useDirectorStore = create<DirectorState>()(
             },
 
             regenerateShot: async (shotId: string, feedback: string) => {
-                const { plan, castModel } = get();
+                const { plan, castModel, intensity } = get();
                 const { activeProject } = useProjectStore.getState();
                 
                 if (!plan || !activeProject) return;
@@ -181,7 +185,7 @@ export const useDirectorStore = create<DirectorState>()(
                 } as ModelAttributes;
 
                 try {
-                     await executeSingleShot(shot, campaignModel, activeProject.id, activeProject.customInstructions, feedback);
+                     await executeSingleShot(shot, campaignModel, activeProject.id, intensity, activeProject.customInstructions, feedback);
                      set({ plan: { ...plan, shots: get().plan!.shots.map(s => s.id === shotId ? { ...s, status: 'DONE' } : s) } });
                      useUIStore.getState().addToast("Shot Regenerated with Feedback", 'success');
                 } catch(e) {
@@ -221,7 +225,8 @@ export const useDirectorStore = create<DirectorState>()(
             partialize: (state) => ({ 
                 // Only persist data, not transient loading states
                 plan: state.plan, 
-                brief: state.brief, 
+                brief: state.brief,
+                intensity: state.intensity,
                 castModel: state.castModel,
                 auditReport: state.auditReport 
             })
@@ -229,13 +234,13 @@ export const useDirectorStore = create<DirectorState>()(
     )
 );
 
-async function executeSingleShot(shot: DirectorShot, model: ModelAttributes, projectId: string, projectContext?: string, feedback?: string) {
+async function executeSingleShot(shot: DirectorShot, model: ModelAttributes, projectId: string, intensity: number, projectContext?: string, feedback?: string) {
     const { addAsset } = useGalleryStore.getState();
     const { trackUsage } = useBillingStore.getState();
     const { plan } = useDirectorStore.getState();
 
     const baseVibe = `${plan?.campaignName || 'Campaign'} Aesthetic. ${plan?.modelBrief.clothingStyle || "Fashion"}`;
-    const { settings, mode } = DirectorAgent.mapShotToSettings(shot, baseVibe);
+    const { settings, mode } = DirectorAgent.mapShotToSettings(shot, baseVibe, intensity);
 
     let result: GenerationResult;
     if (mode === 'STUDIO') {

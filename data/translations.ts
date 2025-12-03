@@ -121,7 +121,7 @@ export const TRANSLATIONS = {
         PRE_SHARE: "Share",
         PRE_DOWNLOAD: "Download",
         PRE_PROMPT: "Prompt Matrix",
-        PRE_COPIED: "Copied",
+        PRE_COPIED: "Copiado",
         PRE_COPY: "Copy",
         
         // Editor (Magic Canvas)
@@ -129,7 +129,7 @@ export const TRANSLATIONS = {
         EDT_BRUSH: "Brush Size",
         EDT_INSTRUCTION: "What should we change?",
         EDT_PLACEHOLDER: "e.g. Fix the eyes, change hair to red...",
-        EDT_APPLY: "Generate Edit",
+        EDT_APPLY: "Generar Edición",
         EDT_CANCEL: "Cancel",
         EDT_CLEAR: "Clear Mask",
 
@@ -179,6 +179,10 @@ export const TRANSLATIONS = {
         OPT_ETH_AFRICAN_AMERICAN: "African American",
         OPT_ETH_MIDDLE_EASTERN: "Middle Eastern",
         OPT_ETH_NORDIC: "Nordic",
+        OPT_ETH_MIXED: "Mixed",
+        OPT_ETH_SLAVIC: "Slavic",
+        OPT_ETH_PACIFIC_ISLANDER: "Pacific Islander",
+        
         // Physique
         OPT_BODY_SLIM_MODEL: "Slim Model",
         OPT_BODY_ATHLETIC: "Athletic",
@@ -202,7 +206,7 @@ export const TRANSLATIONS = {
         
         // Hair & Style
         OPT_HAIR_LONG_WAVY: "Long Wavy", OPT_HAIR_BOB_CUT: "Bob Cut", OPT_HAIR_PIXIE: "Pixie", OPT_HAIR_STRAIGHT: "Straight", OPT_HAIR_BRAIDS: "Braids", OPT_HAIR_PONYTAIL: "Ponytail", OPT_HAIR_MESSY_BUN: "Messy Bun", OPT_HAIR_FADE: "Fade", OPT_HAIR_BUZZ_CUT: "Buzz Cut", OPT_HAIR_MAN_BUN: "Man Bun", OPT_HAIR_SIDE_PART: "Side Part",
-        OPT_HCOLOR_BRUNETTE: "Brunette", OPT_HCOLOR_BLONDE: "Blonde", OPT_HCOLOR_PLATINUM: "Platinum", OPT_HCOLOR_REDHEAD: "Redhead", OPT_HCOLOR_BLACK: "Black", OPT_HCOLOR_PINK_PASTEL: "Pink Pastel", OPT_HCOLOR_SILVER: "Silver", OPT_HCOLOR_GREY: "Grey",
+        OPT_HCOLOR_BRUNETTE: "Brunette", OPT_HCOLOR_BLONDE: "Blonde", OPT_HCOLOR_PLATINUM: "Platinum", OPT_HCOLOR_REDHEAD: "Redhead", OPT_HCOLOR_BLACK: "Black", OPT_HCOLOR_PINK_PASTEL: "Pink Pastel", OPT_HCOLOR_SILVER: "Silver", OPT_HCOLOR_GREY: "Grey", OPT_HCOLOR_BLEACHED: "Bleached",
         OPT_STYLE_STREETWEAR: "Streetwear", OPT_STYLE_BUSINESS_CHIC: "Business Chic", OPT_STYLE_BOHEMIAN: "Bohemian", OPT_STYLE_MINIMALIST: "Minimalist", OPT_STYLE_HIGH_FASHION: "High Fashion", OPT_STYLE_CYBERPUNK: "Cyberpunk", OPT_STYLE_VINTAGE: "Vintage", OPT_STYLE_SPORTY: "Sporty"
     },
     ES: {
@@ -383,6 +387,10 @@ export const TRANSLATIONS = {
         OPT_ETH_AFRICAN_AMERICAN: "Afroamericana",
         OPT_ETH_MIDDLE_EASTERN: "Medio Oriente",
         OPT_ETH_NORDIC: "Nórdica",
+        OPT_ETH_MIXED: "Mixta",
+        OPT_ETH_SLAVIC: "Eslava",
+        OPT_ETH_PACIFIC_ISLANDER: "Isleña del Pacífico",
+        
         // Physique
         OPT_BODY_SLIM_MODEL: "Modelo Delgada",
         OPT_BODY_ATHLETIC: "Atlética",
@@ -406,7 +414,7 @@ export const TRANSLATIONS = {
         
         // Hair & Style
         OPT_HAIR_LONG_WAVY: "Largo Ondulado", OPT_HAIR_BOB_CUT: "Corte Bob", OPT_HAIR_PIXIE: "Pixie", OPT_HAIR_STRAIGHT: "Lacio", OPT_HAIR_BRAIDS: "Trenzas", OPT_HAIR_PONYTAIL: "Coleta", OPT_HAIR_MESSY_BUN: "Moño Despeinado", OPT_HAIR_FADE: "Degradado", OPT_HAIR_BUZZ_CUT: "Rapado", OPT_HAIR_MAN_BUN: "Moño Masc.", OPT_HAIR_SIDE_PART: "Raya al Lado",
-        OPT_HCOLOR_BRUNETTE: "Castaño", OPT_HCOLOR_BLONDE: "Rubio", OPT_HCOLOR_PLATINUM: "Platino", OPT_HCOLOR_REDHEAD: "Pelirrojo", OPT_HCOLOR_BLACK: "Negro", OPT_HCOLOR_PINK_PASTEL: "Rosa Pastel", OPT_HCOLOR_SILVER: "Plata", OPT_HCOLOR_GREY: "Gris",
+        OPT_HCOLOR_BRUNETTE: "Castaño", OPT_HCOLOR_BLONDE: "Rubio", OPT_HCOLOR_PLATINUM: "Platino", OPT_HCOLOR_REDHEAD: "Pelirrojo", OPT_HCOLOR_BLACK: "Negro", OPT_HCOLOR_PINK_PASTEL: "Rosa Pastel", OPT_HCOLOR_SILVER: "Plata", OPT_HCOLOR_GREY: "Gris", OPT_HCOLOR_BLEACHED: "Decolorado",
         OPT_STYLE_STREETWEAR: "Urbano", OPT_STYLE_BUSINESS_CHIC: "Ejecutivo Chic", OPT_STYLE_BOHEMIAN: "Bohemio", OPT_STYLE_MINIMALIST: "Minimalista", OPT_STYLE_HIGH_FASHION: "Alta Costura", OPT_STYLE_CYBERPUNK: "Cyberpunk", OPT_STYLE_VINTAGE: "Vintage", OPT_STYLE_SPORTY: "Deportivo"
     }
 };

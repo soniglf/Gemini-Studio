@@ -58,7 +58,7 @@ async function executeWithCascade(
     try {
         return await primaryFn();
     } catch (error: any) {
-        if (error.message && error.message.includes('Safety')) {
+        if (error.message && (error.message.includes('Safety') || error.message.includes('Refused'))) {
             throw error;
         }
 
@@ -91,9 +91,13 @@ export async function attemptImageGeneration(
 
         Object.entries(images).forEach(([key, base64]) => {
             if(!base64) return;
-            let data = base64.includes(',') ? base64.split(',')[1] : base64;
-            let mime = base64.match(/:(.*?);/)?.[1] || 'image/png';
-            parts.push({ inlineData: { mimeType: mime, data } });
+            try {
+                let data = base64.includes(',') ? base64.split(',')[1] : base64;
+                let mime = base64.match(/:(.*?);/)?.[1] || 'image/png';
+                parts.push({ inlineData: { mimeType: mime, data } });
+            } catch (e) {
+                console.warn(`Skipping invalid image input for key: ${key}`);
+            }
         });
 
         const isPro = targetModel.includes('pro');
@@ -127,12 +131,22 @@ export async function attemptImageGeneration(
              throw new Error("Generation blocked by Safety Filters. Please adjust your prompt.");
         }
 
+        // Check for Image Data
         const part = candidate.content?.parts?.find(p => p.inlineData);
-        
         if (part?.inlineData) {
             return base64ToBlob(part.inlineData.data, part.inlineData.mimeType);
         }
-        return null;
+
+        // Check for Text Refusal (Common with image models)
+        const textPart = candidate.content?.parts?.find(p => p.text);
+        if (textPart?.text) {
+            console.warn("Model Refusal:", textPart.text);
+            const msg = textPart.text.length > 100 ? textPart.text.substring(0, 100) + "..." : textPart.text;
+            throw new Error(`Generation Refused: ${msg}`);
+        }
+
+        // If we get here, we have a candidate but no image and no text. 
+        throw new Error(`Generation failed. Finish Reason: ${reason || 'UNKNOWN'}`);
     };
 
     try {
@@ -141,17 +155,30 @@ export async function attemptImageGeneration(
             undefined 
         );
     } catch (e: any) {
-        // Auto-downgrade logic
-        const isModelError = e.message?.includes('404') || e.message?.includes('not found') || e.message?.includes('model') || e.message?.includes('permission');
-        const isProRequest = modelName.includes('pro');
+        // Auto-downgrade logic for 403 Permission Denied and other model access errors
+        const errString = (JSON.stringify(e) + (e.message || '')).toLowerCase();
         
+        const isModelError = 
+            errString.includes('404') || 
+            errString.includes('not found') || 
+            errString.includes('model') || 
+            errString.includes('permission') || 
+            errString.includes('denied') ||
+            errString.includes('403');
+            
+        const isProRequest = modelName.includes('pro') || modelName.includes('preview');
+        
+        // If the PRO model fails with a permission/403 error, fallback to Flash
         if (isProRequest && (isModelError || keyType === 'FREE')) {
-            console.warn(`[Auto-Downgrade] Pro model ${modelName} failed. Retrying with Flash model.`);
+            console.warn(`[Auto-Downgrade] Pro model ${modelName} failed. Retrying with Flash model.`, e);
             try {
                 return await generate(MODELS.IMAGE.FAST);
             } catch (fallbackError: any) {
-                // If fallback fails, throw original error if it was Safety related, otherwise throw fallback error
-                if (fallbackError.message?.includes('Safety')) throw fallbackError;
+                // If fallback also fails, likely a broader issue (Safety or Key invalid for all)
+                if (fallbackError.message?.includes('Safety') || fallbackError.message?.includes('Refused')) throw fallbackError;
+                
+                // If original was permission denied, rethrow that to let user know, 
+                // UNLESS fallback succeeded (which we return above).
                 throw e; 
             }
         }

@@ -1,18 +1,19 @@
-import React, { memo, useEffect } from 'react';
+
+import React, { memo, useEffect, useState } from 'react';
 import { InfluencerSettings, GenerationTier } from '../../types';
-import { ProControls } from './Shared';
-import { Button, TextArea, VisualGridSelect, DebouncedInput } from '../../components/UI';
+import { ProControls, WorkspaceDock } from './Shared';
+import { TextArea, VisualGridSelect, DebouncedInput } from '../../components/UI';
 import { LocationSelector } from '../shared/LocationSelector';
-import { Zap, Camera } from 'lucide-react';
 import { OPTIONS } from '../../data/constants';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { useGenerationStore } from '../../stores/generationStore';
 import { useUIStore } from '../../stores/uiStore';
 
 export const InfluencerWorkspace = memo(() => {
-    const { influencerSettings, setInfluencerSettings, generate, locationPreviews, isPreviewLoading, fetchPreviews } = useGenerationStore();
+    const { influencerSettings, setInfluencerSettings, generate, locationPreviews, isPreviewLoading, fetchPreviews, isGenerating } = useGenerationStore();
     const { isPro } = useUIStore();
     const { t } = useTranslation();
+    const [tier, setTier] = useState<GenerationTier>(GenerationTier.RENDER);
 
     useEffect(() => { fetchPreviews(); }, [influencerSettings.location]);
 
@@ -36,10 +37,12 @@ export const InfluencerWorkspace = memo(() => {
                 <VisualGridSelect label={t('LBL_VIBE')} value={influencerSettings.vibe} options={mapOptions(OPTIONS.vibe, 'OPT_VIBE')} onChange={(e: any) => update('vibe', e.target.value)} />
             </div>
             
-            <div className="flex gap-2 mt-8">
-                <Button variant="secondary" className="flex-1" onClick={() => generate(GenerationTier.SKETCH)}><Zap size={18} className="text-yellow-400"/></Button>
-                <Button className="flex-[3] bg-gradient-to-r from-blue-600 to-cyan-600" onClick={() => generate(GenerationTier.RENDER)}>{t('BTN_SNAP')} <Camera size={18}/></Button>
-            </div>
+            <WorkspaceDock 
+                onGenerate={() => generate(tier)}
+                isGenerating={isGenerating}
+                tier={tier}
+                setTier={setTier}
+            />
         </div>
     );
 });

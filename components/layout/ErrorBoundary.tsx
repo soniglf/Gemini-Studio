@@ -1,3 +1,4 @@
+
 import React, { ReactNode } from 'react';
 
 interface ErrorBoundaryProps {
@@ -10,16 +11,16 @@ interface ErrorBoundaryState {
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-    constructor(props: ErrorBoundaryProps) {
-        super(props);
-        this.state = { hasError: false, error: null };
-    }
+    public state: ErrorBoundaryState = {
+        hasError: false,
+        error: null
+    };
 
     static getDerivedStateFromError(error: Error): ErrorBoundaryState {
         return { hasError: true, error };
     }
 
-    render() {
+    render(): ReactNode {
         if (this.state.hasError) {
              return (
                  <div className="p-8 text-center text-red-400 border border-red-500/20 bg-red-900/10 rounded-xl m-4">
@@ -28,6 +29,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                  </div>
              );
         }
-        return this.props.children;
+        return (this as any).props.children;
     }
 }

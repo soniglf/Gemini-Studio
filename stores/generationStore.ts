@@ -1,375 +1,406 @@
+
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppMode, GenerationTier, GenerationResult, StudioSettings, InfluencerSettings, MotionSettings, ModelAttributes, GeneratedAsset, DirectorShot } from '../types';
-import { INITIAL_STUDIO, INITIAL_INFLUENCER, INITIAL_MOTION } from '../data/constants';
-import { attemptImageGeneration, attemptVideoGeneration, generateLocationPreviews } from '../services/ai/execution';
-import { ImageAgent } from '../services/ai/agents/imageAgent';
-import { VideoAgent } from '../services/ai/agents/videoAgent';
-import { EditAgent } from '../services/ai/agents/editAgent';
+import { AppMode, GeneratedAsset, StudioSettings, InfluencerSettings, MotionSettings, GenerationResult, GenerationTier, ModelAttributes, DirectorShot } from '../types';
+import { generateStudioImage, generateInfluencerImage, generateVideo, editImage, refineImage } from '../services/geminiService';
+import { attemptImageGeneration, attemptVideoGeneration } from '../services/ai/execution';
 import { MODELS } from '../services/ai/config';
 import { useUIStore } from './uiStore';
-import { useProjectStore } from './projectStore';
 import { useModelStore } from './modelStore';
 import { useBillingStore } from './billingStore';
-import { useGalleryStore } from './galleryStore';
-
-// HELPER: Extracted execution logic
-async function executeGeneration(
-    prompt: string, 
-    modelName: string, 
-    config: any, 
-    tier: GenerationTier, 
-    mode: AppMode,
-    model: ModelAttributes,
-    activeProject: any,
-    addAsset: (asset: GeneratedAsset) => Promise<void>,
-    trackUsage: (asset: GeneratedAsset) => void,
-    sessionId: string = `sess-${Date.now()}`
-) {
-    const { setLastGenerated } = useGenerationStore.getState();
-    const { addToast } = useUIStore.getState();
-    const settings = config.settings;
-
-    let result: GenerationResult;
-    const iterations = (mode === AppMode.STUDIO && settings.batchSize > 1) ? settings.batchSize : 1;
-    
-    // IMAGE PAYLOAD CONSTRUCTION
-    const images: Record<string, string> = {};
-    if (model.referenceImages && model.referenceImages.length > 0) {
-        model.referenceImages.forEach((ref, index) => images[`face_${index}`] = ref);
-    } else if (model.referenceImage) {
-            images['face'] = model.referenceImage;
-    }
-    if (model.accessoriesImage) images['accessories'] = model.accessoriesImage;
-    if (settings.outfitImage) images['outfit'] = settings.outfitImage;
-    if (settings.productImage) images['product'] = settings.productImage;
-    if (settings.selectedLocationPreview) images['background_ref'] = settings.selectedLocationPreview;
-
-    for(let i=0; i<iterations; i++) {
-        const keyType = tier === GenerationTier.SKETCH ? 'FREE' : 'PAID';
-        
-        let blob: Blob | null = null;
-
-        if (mode === AppMode.MOTION) {
-            // Motion requires separate handling for video
-            blob = await attemptVideoGeneration(modelName, prompt, settings.aspectRatio, settings.resolution, 'PAID', settings.sourceImage);
-             result = { 
-                url: URL.createObjectURL(blob!), 
-                blob: blob!, 
-                finalPrompt: prompt, 
-                usedModel: modelName, 
-                keyType: 'PAID', 
-                tier, 
-                tags: ["Motion", "Video"],
-                sessionId
-            };
-        } else {
-             // Images
-             blob = await attemptImageGeneration(modelName, prompt, images, settings.aspectRatio, settings.resolution, keyType, settings.seed);
-             result = { 
-                url: URL.createObjectURL(blob!), 
-                blob: blob!, 
-                finalPrompt: prompt, 
-                usedModel: modelName, 
-                keyType, 
-                tier, 
-                tags: [mode, settings.vibe || "Studio"],
-                sessionId
-            };
-        }
-        
-        const asset: GeneratedAsset = {
-            id: Date.now().toString() + i, 
-            projectId: activeProject.id,
-            sessionId: sessionId,
-            url: result.url,
-            blob: result.blob,
-            type: mode === AppMode.MOTION ? 'VIDEO' : 'IMAGE',
-            prompt: result.finalPrompt, timestamp: Date.now(), mode, isMagic: true, modelId: model.id,
-            usedModel: result.usedModel, keyType: result.keyType, tier: result.tier,
-            cost: result.keyType === 'FREE' ? 0 : (mode === AppMode.MOTION ? 0.20 : 0.04),
-            settings: settings,
-            tags: result.tags
-        };
-        
-        await addAsset(asset);
-        trackUsage(asset);
-        
-        setLastGenerated(asset);
-    }
-    
-    useGenerationStore.setState({ isGenerating: false });
-    addToast("Generation Complete", 'success');
-}
+import { useProjectStore } from './projectStore';
+import { DirectorAgent } from '../services/ai/agents/directorAgent';
+import { INITIAL_STUDIO, INITIAL_INFLUENCER, INITIAL_MOTION } from '../data/constants';
 
 interface GenerationState {
-    isGenerating: boolean;
-    lastGenerated: GeneratedAsset | GenerationResult | null;
-    
     studioSettings: StudioSettings;
     influencerSettings: InfluencerSettings;
     motionSettings: MotionSettings;
-    lockedKeys: string[];
     
+    isGenerating: boolean;
+    lastGenerated: GeneratedAsset | null;
+    history: GeneratedAsset[];
+    historyIndex: number;
+    
+    // Glass Box Interceptor
     interceptEnabled: boolean;
-    pendingPrompt: { prompt: string, modelName: string, config: any, tier: GenerationTier, mode: AppMode } | null;
-    
+    pendingPrompt: { prompt: string, modelName: string, tier: GenerationTier, resolve: (p: string) => void, reject: () => void } | null;
+
+    // Location Previews
     locationPreviews: string[];
     isPreviewLoading: boolean;
 
-    history: any[]; 
-    historyIndex: number;
+    // UI State
+    lockedKeys: string[];
 
     setStudioSettings: (s: StudioSettings) => void;
     setInfluencerSettings: (s: InfluencerSettings) => void;
     setMotionSettings: (s: MotionSettings) => void;
-    toggleLock: (key: string) => void;
-    toggleIntercept: () => void;
+    setLastGenerated: (asset: GeneratedAsset | null) => void;
     
     generate: (tier: GenerationTier) => Promise<void>;
-    confirmGeneration: (editedPrompt: string) => Promise<void>;
+    edit: (original: Blob, mask: Blob, prompt: string) => Promise<void>;
+    refine: (asset: GeneratedAsset) => Promise<void>;
+    
+    // Interceptor Actions
+    toggleIntercept: () => void;
+    confirmGeneration: (editedPrompt: string) => void;
     cancelGeneration: () => void;
     
-    edit: (original: Blob, mask: Blob, instruction: string) => Promise<void>;
-    refine: (asset: GeneratedAsset) => Promise<void>;
-    applyRefinement: (updates: any) => void;
-    
-    hydrateFromDirector: (shot: DirectorShot) => void;
-    restoreState: (metadata: any) => void;
-    
-    fetchPreviews: () => Promise<void>;
-    
+    // History Actions
     undo: () => void;
     redo: () => void;
-    setLastGenerated: (res: GeneratedAsset | GenerationResult) => void;
+    restoreState: (asset: GeneratedAsset) => void;
+    hydrateFromDirector: (shot: DirectorShot) => void;
+
+    // Locking
+    toggleLock: (key: string) => void;
+
+    fetchPreviews: () => Promise<void>;
+    applyRefinement: (updates: Partial<StudioSettings | InfluencerSettings | MotionSettings>) => void;
 }
 
 export const useGenerationStore = create<GenerationState>()(
     persist(
         (set, get) => ({
-            isGenerating: false,
-            lastGenerated: null,
             studioSettings: INITIAL_STUDIO,
             influencerSettings: INITIAL_INFLUENCER,
             motionSettings: INITIAL_MOTION,
-            lockedKeys: [],
-            interceptEnabled: false,
-            pendingPrompt: null,
-            locationPreviews: [],
-            isPreviewLoading: false,
+            
+            isGenerating: false,
+            lastGenerated: null,
             history: [],
             historyIndex: -1,
+            
+            interceptEnabled: false,
+            pendingPrompt: null,
+            
+            locationPreviews: [],
+            isPreviewLoading: false,
+            lockedKeys: [],
 
-            setStudioSettings: (s) => set(state => {
-                 // Push to history if different
-                 // Implementation of history logic is simplified here
-                 return { studioSettings: s };
-            }),
+            setStudioSettings: (s) => set({ studioSettings: s }),
             setInfluencerSettings: (s) => set({ influencerSettings: s }),
             setMotionSettings: (s) => set({ motionSettings: s }),
-            
-            toggleLock: (key) => set(state => ({ 
-                lockedKeys: state.lockedKeys.includes(key) 
-                    ? state.lockedKeys.filter(k => k !== key) 
-                    : [...state.lockedKeys, key] 
-            })),
-            
+            setLastGenerated: (asset) => set({ lastGenerated: asset }),
+
+            toggleLock: (key) => set(state => {
+                const locked = state.lockedKeys.includes(key) 
+                    ? state.lockedKeys.filter(k => k !== key)
+                    : [...state.lockedKeys, key];
+                return { lockedKeys: locked };
+            }),
+
             toggleIntercept: () => set(state => ({ interceptEnabled: !state.interceptEnabled })),
 
-            generate: async (tier) => {
+            confirmGeneration: (editedPrompt) => {
+                const { pendingPrompt } = get();
+                if (pendingPrompt) {
+                    pendingPrompt.resolve(editedPrompt);
+                    set({ pendingPrompt: null });
+                }
+            },
+
+            cancelGeneration: () => {
+                const { pendingPrompt } = get();
+                if (pendingPrompt) {
+                    pendingPrompt.reject();
+                    set({ pendingPrompt: null, isGenerating: false });
+                }
+            },
+
+            hydrateFromDirector: (shot) => {
+                const { settings, mode } = DirectorAgent.mapShotToSettings(shot, "Director Mode");
+                if (mode === 'STUDIO') set({ studioSettings: settings as StudioSettings });
+                else set({ influencerSettings: settings as InfluencerSettings });
+            },
+
+            applyRefinement: (updates) => {
+                const { mode } = useUIStore.getState();
+                if (mode === AppMode.STUDIO) set(s => ({ studioSettings: { ...s.studioSettings, ...updates } }));
+                else if (mode === AppMode.INFLUENCER) set(s => ({ influencerSettings: { ...s.influencerSettings, ...updates } }));
+                else if (mode === AppMode.MOTION) set(s => ({ motionSettings: { ...s.motionSettings, ...updates } }));
+            },
+
+            generate: async (tier: GenerationTier) => {
                 const { mode, addToast } = useUIStore.getState();
-                const { activeProject } = useProjectStore.getState();
                 const { model } = useModelStore.getState();
+                const { activeProject } = useProjectStore.getState();
+                const { trackUsage } = useBillingStore.getState();
+                
+                // Lazy load to avoid cycle, and await it properly
+                const { addAsset } = await import('./galleryStore').then(m => m.useGalleryStore.getState());
+                
                 const { studioSettings, influencerSettings, motionSettings, interceptEnabled } = get();
 
-                if (!activeProject) return addToast("Select a campaign first", 'error');
-                if (!model) return addToast("Select a model first", 'error');
+                if (!activeProject) {
+                    addToast("No Active Campaign", 'error');
+                    return;
+                }
 
                 set({ isGenerating: true });
 
                 try {
-                    let prompt = "";
+                    let result: GenerationResult;
+                    const sessionId = Date.now().toString();
+                    
+                    // 1. DETERMINE PROMPT & MODEL
+                    let settings: any = {};
+                    let builderMethod: Function;
                     let modelName = "";
-                    let config: any = {};
 
-                    if (mode === AppMode.STUDIO) {
-                        prompt = await ImageAgent.buildStudioPrompt(model, studioSettings, activeProject.customInstructions);
+                    if (mode === AppMode.CREATOR) {
+                        // Creator Mode Logic (Turnaround Sheet)
+                        // Uses ImageAgent but with special handling
+                        settings = { resolution: '2K', aspectRatio: '1:1', seed: undefined };
+                        modelName = MODELS.IMAGE.PRO;
+                    } else if (mode === AppMode.STUDIO) {
+                        settings = studioSettings;
+                        builderMethod = generateStudioImage;
                         modelName = tier === GenerationTier.RENDER ? MODELS.IMAGE.PRO : MODELS.IMAGE.FAST;
-                        config = { settings: studioSettings };
                     } else if (mode === AppMode.INFLUENCER) {
-                        prompt = await ImageAgent.buildInfluencerPrompt(model, influencerSettings, activeProject.customInstructions);
+                        settings = influencerSettings;
+                        builderMethod = generateInfluencerImage;
                         modelName = tier === GenerationTier.RENDER ? MODELS.IMAGE.PRO : MODELS.IMAGE.FAST;
-                        config = { settings: influencerSettings };
                     } else if (mode === AppMode.MOTION) {
-                        prompt = await VideoAgent.buildVideoPrompt(model, motionSettings, activeProject.customInstructions);
-                        modelName = tier === GenerationTier.SKETCH ? MODELS.VIDEO.FAST : MODELS.VIDEO.PRO; // Video tiers slightly different mapping
-                        config = { settings: motionSettings };
+                        settings = motionSettings;
+                        builderMethod = generateVideo;
+                        modelName = tier === GenerationTier.SKETCH ? MODELS.VIDEO.FAST : MODELS.VIDEO.PRO;
                     }
 
+                    // 2. BUILD PROMPT (And Intercept if needed)
+                    let prompt = "";
+                    if (mode === AppMode.CREATOR) {
+                        const { ImageAgent } = await import('../services/ai/agents/imageAgent');
+                        prompt = await ImageAgent.buildCreatorPrompt(model);
+                    } else if (mode === AppMode.STUDIO) {
+                        const { ImageAgent } = await import('../services/ai/agents/imageAgent');
+                        prompt = await ImageAgent.buildStudioPrompt(model, settings, activeProject.customInstructions);
+                    } else if (mode === AppMode.INFLUENCER) {
+                        const { ImageAgent } = await import('../services/ai/agents/imageAgent');
+                        prompt = await ImageAgent.buildInfluencerPrompt(model, settings, activeProject.customInstructions);
+                    } else if (mode === AppMode.MOTION) {
+                         const { VideoAgent } = await import('../services/ai/agents/videoAgent');
+                         prompt = await VideoAgent.buildVideoPrompt(model, settings, activeProject.customInstructions);
+                    }
+
+                    // GLASS BOX INTERCEPTION
                     if (interceptEnabled) {
-                        set({ 
-                            pendingPrompt: { prompt, modelName, config, tier, mode },
-                            isGenerating: false
-                        });
-                        return;
+                        try {
+                            prompt = await new Promise<string>((resolve, reject) => {
+                                set({ pendingPrompt: { prompt, modelName, tier, resolve, reject } });
+                            });
+                        } catch (e) {
+                            // Cancelled
+                            return; 
+                        }
                     }
 
-                    await executeGeneration(
-                        prompt, modelName, config, tier, mode, model, activeProject, 
-                        useGalleryStore.getState().addAsset, 
-                        useBillingStore.getState().trackUsage
-                    );
+                    // 3. EXECUTE GENERATION
+                    const images: Record<string, string> = {};
+                    const keyType = tier === GenerationTier.SKETCH ? 'FREE' : 'PAID';
+                    const iterations = (mode === AppMode.STUDIO && settings.batchSize) ? settings.batchSize : 1;
+                    
+                    // CRITICAL FIX: Allow Identity/Reference images in ALL modes if strictness is active
+                    if (model.strictness > 0) {
+                         if (model.referenceImages && model.referenceImages.length > 0) {
+                            model.referenceImages.slice(0, 3).forEach((ref, i) => images[`ref_${i}`] = ref);
+                        } else if (model.referenceImage) {
+                            images['face'] = model.referenceImage;
+                        }
+                    }
+
+                    if (mode !== AppMode.CREATOR) {
+                        if (settings.outfitImage) images['outfit'] = settings.outfitImage;
+                        if (settings.productImage) images['product'] = settings.productImage;
+                        if (settings.selectedLocationPreview) images['background_ref'] = settings.selectedLocationPreview;
+                    }
+
+                    if (model.accessoriesImage) images['accessories'] = model.accessoriesImage;
+
+                    for(let i=0; i<iterations; i++) {
+                        let blob: Blob | null = null;
+
+                        if (mode === AppMode.MOTION) {
+                            blob = await attemptVideoGeneration(modelName, prompt, settings.aspectRatio, settings.resolution, 'PAID', settings.sourceImage);
+                            
+                            if (!blob) throw new Error("Video generation failed to return valid data.");
+
+                             result = { 
+                                url: URL.createObjectURL(blob), 
+                                blob: blob, 
+                                finalPrompt: prompt, 
+                                usedModel: modelName, 
+                                keyType: 'PAID', 
+                                tier, 
+                                tags: ["Motion", "Video"],
+                                sessionId
+                            };
+                        } else {
+                             // Images
+                             // Creator Mode forces 1:1 for the square turnaround sheet
+                             const ratio = mode === AppMode.CREATOR ? '1:1' : (settings.aspectRatio || '1:1');
+                             const res = mode === AppMode.CREATOR ? '2K' : (settings.resolution || '1K');
+
+                             blob = await attemptImageGeneration(modelName, prompt, images, ratio, res, keyType, settings.seed);
+                             
+                             if (!blob) throw new Error("Image generation failed to return valid data.");
+
+                             result = { 
+                                url: URL.createObjectURL(blob), 
+                                blob: blob, 
+                                finalPrompt: prompt, 
+                                usedModel: modelName, 
+                                keyType, 
+                                tier, 
+                                tags: [mode, settings.vibe || "Reference"],
+                                sessionId
+                            };
+                        }
+                        
+                        const asset: GeneratedAsset = {
+                            id: Date.now().toString() + i,
+                            projectId: activeProject.id,
+                            url: result.url,
+                            blob: result.blob,
+                            type: result.tags?.includes('Video') ? 'VIDEO' : 'IMAGE',
+                            prompt: result.finalPrompt,
+                            timestamp: Date.now(),
+                            mode: mode,
+                            isMagic: false,
+                            modelId: model.id,
+                            usedModel: result.usedModel,
+                            keyType: result.keyType,
+                            tier: result.tier,
+                            cost: 0.04,
+                            settings: settings,
+                            tags: result.tags,
+                            sessionId
+                        };
+
+                        // 4. SAVE & DISPLAY
+                        await addAsset(asset);
+                        
+                        set({ lastGenerated: asset });
+                        set(s => {
+                            const newHistory = [...s.history, asset];
+                            return { history: newHistory, historyIndex: newHistory.length - 1 };
+                        });
+                        
+                        trackUsage(asset);
+                    }
+
+                    addToast("Generation Complete", 'success');
 
                 } catch (e: any) {
-                    console.error(e);
-                    addToast(e.message, 'error');
+                    console.error("Generation Error", e);
+                    addToast(e.message || "Generation Failed", 'error');
+                } finally {
                     set({ isGenerating: false });
                 }
             },
 
-            confirmGeneration: async (editedPrompt) => {
-                const { pendingPrompt } = get();
-                if (!pendingPrompt) return;
-
-                set({ pendingPrompt: null, isGenerating: true });
+            edit: async (original, mask, prompt) => {
                 const { activeProject } = useProjectStore.getState();
                 const { model } = useModelStore.getState();
-
+                
+                set({ isGenerating: true });
                 try {
-                    await executeGeneration(
-                        editedPrompt, pendingPrompt.modelName, pendingPrompt.config, pendingPrompt.tier, pendingPrompt.mode, model, activeProject, 
-                        useGalleryStore.getState().addAsset, 
-                        useBillingStore.getState().trackUsage
-                    );
+                    const result = await editImage(original, mask, prompt);
+                    
+                    const asset: GeneratedAsset = {
+                        id: Date.now().toString(),
+                        projectId: activeProject!.id,
+                        url: result.url,
+                        blob: result.blob,
+                        type: 'IMAGE',
+                        prompt: result.finalPrompt,
+                        timestamp: Date.now(),
+                        mode: AppMode.STUDIO,
+                        isMagic: true,
+                        modelId: model.id,
+                        usedModel: result.usedModel,
+                        keyType: 'PAID',
+                        tier: GenerationTier.RENDER,
+                        cost: 0.02,
+                        tags: ['Edited']
+                    };
+
+                    const galleryStore = await import('./galleryStore').then(m => m.useGalleryStore.getState());
+                    await galleryStore.addAsset(asset);
+                    set({ lastGenerated: asset });
+
                 } catch (e: any) {
                     useUIStore.getState().addToast(e.message, 'error');
+                } finally {
                     set({ isGenerating: false });
                 }
-            },
-
-            cancelGeneration: () => set({ pendingPrompt: null, isGenerating: false }),
-
-            edit: async (original, mask, instruction) => {
-                 const { addToast } = useUIStore.getState();
-                 const { activeProject } = useProjectStore.getState();
-                 const { model } = useModelStore.getState();
-                 set({ isGenerating: true });
-                 try {
-                     const result = await EditAgent.edit(original, mask, instruction);
-                     set({ lastGenerated: result, isGenerating: false });
-                     
-                     // Add asset
-                     if (activeProject) {
-                         const asset: GeneratedAsset = {
-                             id: Date.now().toString(),
-                             projectId: activeProject.id,
-                             url: result.url,
-                             blob: result.blob,
-                             type: 'IMAGE',
-                             prompt: result.finalPrompt,
-                             timestamp: Date.now(),
-                             mode: AppMode.STUDIO,
-                             isMagic: true,
-                             modelId: model.id,
-                             usedModel: result.usedModel,
-                             keyType: result.keyType,
-                             tier: result.tier,
-                             cost: 0.04,
-                             tags: ["Edit"]
-                         };
-                         useGalleryStore.getState().addAsset(asset);
-                         useBillingStore.getState().trackUsage(asset);
-                         set({ lastGenerated: asset });
-                     }
-                 } catch(e: any) {
-                     addToast(e.message, 'error');
-                     set({ isGenerating: false });
-                 }
             },
 
             refine: async (asset) => {
-                 const { addToast } = useUIStore.getState();
+                 if (!asset.blob) return;
                  set({ isGenerating: true });
                  try {
-                     if (!asset.blob) throw new Error("Asset data missing");
-                     const result = await EditAgent.refine(asset.blob, asset.prompt);
+                     const result = await refineImage(asset.blob, asset.prompt);
+                     const newAsset = { ...asset, id: Date.now().toString(), url: result.url, blob: result.blob, prompt: "REFINED: " + asset.prompt, timestamp: Date.now() };
                      
-                     // Add asset
-                      const { activeProject } = useProjectStore.getState();
-                     if (activeProject) {
-                         const newAsset: GeneratedAsset = {
-                             ...asset,
-                             id: Date.now().toString(),
-                             url: result.url,
-                             blob: result.blob,
-                             prompt: result.finalPrompt,
-                             timestamp: Date.now(),
-                             tier: result.tier,
-                             tags: [...(asset.tags || []), "Refined"]
-                         };
-                         useGalleryStore.getState().addAsset(newAsset);
-                         useBillingStore.getState().trackUsage(newAsset);
-                         set({ lastGenerated: newAsset, isGenerating: false });
-                     } else {
-                        set({ lastGenerated: result, isGenerating: false });
-                     }
-                 } catch(e: any) {
-                     addToast(e.message, 'error');
+                     const galleryStore = await import('./galleryStore').then(m => m.useGalleryStore.getState());
+                     await galleryStore.addAsset(newAsset);
+                     set({ lastGenerated: newAsset });
+                 } catch (e: any) {
+                     useUIStore.getState().addToast(e.message, 'error');
+                 } finally {
                      set({ isGenerating: false });
                  }
             },
 
-            applyRefinement: (updates) => {
-                 const { mode, addToast } = useUIStore.getState();
-                 if (mode === AppMode.STUDIO) set(s => ({ studioSettings: { ...s.studioSettings, ...updates } }));
-                 else if (mode === AppMode.INFLUENCER) set(s => ({ influencerSettings: { ...s.influencerSettings, ...updates } }));
-                 else if (mode === AppMode.MOTION) set(s => ({ motionSettings: { ...s.motionSettings, ...updates } }));
-                 addToast("Settings Updated", 'success');
-            },
-            
-            hydrateFromDirector: (shot) => {
-                 if (shot.type === 'STUDIO') {
-                     set(s => ({ studioSettings: { ...s.studioSettings, productDescription: shot.description, background: shot.visualDetails } }));
-                 } else {
-                     set(s => ({ influencerSettings: { ...s.influencerSettings, action: shot.description, location: shot.visualDetails } }));
+            undo: () => set(state => {
+                if (state.historyIndex > 0) {
+                    return { 
+                        historyIndex: state.historyIndex - 1,
+                        lastGenerated: state.history[state.historyIndex - 1]
+                    };
+                }
+                return state;
+            }),
+
+            redo: () => set(state => {
+                if (state.historyIndex < state.history.length - 1) {
+                    return {
+                        historyIndex: state.historyIndex + 1,
+                        lastGenerated: state.history[state.historyIndex + 1]
+                    };
+                }
+                return state;
+            }),
+
+            restoreState: (asset) => {
+                 if (asset.settings) {
+                     if (asset.mode === AppMode.STUDIO) set({ studioSettings: asset.settings as StudioSettings });
+                     if (asset.mode === AppMode.INFLUENCER) set({ influencerSettings: asset.settings as InfluencerSettings });
+                     if (asset.mode === AppMode.MOTION) set({ motionSettings: asset.settings as MotionSettings });
+                     
+                     useUIStore.getState().setMode(asset.mode);
+                     useUIStore.getState().addToast("Settings Restored from DNA", 'success');
                  }
-            },
-            
-            restoreState: (metadata) => {
-                const { addToast, setMode } = useUIStore.getState();
-                if (metadata.mode) setMode(metadata.mode);
-                if (metadata.settings) {
-                    if (metadata.mode === AppMode.STUDIO) set({ studioSettings: metadata.settings });
-                    else if (metadata.mode === AppMode.INFLUENCER) set({ influencerSettings: metadata.settings });
-                    else if (metadata.mode === AppMode.MOTION) set({ motionSettings: metadata.settings });
-                }
-                if (metadata.usedModel) {
-                     // Try to match model? Maybe complicated.
-                }
-                addToast("State Restored from Asset", 'success');
             },
 
             fetchPreviews: async () => {
+                const { studioSettings, influencerSettings, motionSettings } = get();
                 const { mode } = useUIStore.getState();
+                
                 let location = "";
-                if (mode === AppMode.STUDIO) location = get().studioSettings.background;
-                else if (mode === AppMode.INFLUENCER) location = get().influencerSettings.location;
-                else if (mode === AppMode.MOTION) location = get().motionSettings.location;
+                if (mode === AppMode.STUDIO) location = studioSettings.background;
+                else if (mode === AppMode.INFLUENCER) location = influencerSettings.location;
+                else if (mode === AppMode.MOTION) location = motionSettings.location;
 
-                if (!location || location.length < 3) return;
+                if (!location) return;
 
                 set({ isPreviewLoading: true });
-                try {
-                    const previews = await generateLocationPreviews(location);
-                    set({ locationPreviews: previews, isPreviewLoading: false });
-                } catch {
-                    set({ isPreviewLoading: false });
-                }
-            },
-
-            undo: () => { /* Simplified */ },
-            redo: () => { /* Simplified */ },
-            setLastGenerated: (res) => set({ lastGenerated: res })
+                const { generateLocationPreviews } = await import('../services/geminiService');
+                const previews = await generateLocationPreviews(location);
+                set({ locationPreviews: previews, isPreviewLoading: false });
+            }
         }),
         {
             name: 'gemini-generation-store',
@@ -378,8 +409,7 @@ export const useGenerationStore = create<GenerationState>()(
                 studioSettings: state.studioSettings,
                 influencerSettings: state.influencerSettings,
                 motionSettings: state.motionSettings,
-                lockedKeys: state.lockedKeys,
-                interceptEnabled: state.interceptEnabled
+                lockedKeys: state.lockedKeys
             })
         }
     )

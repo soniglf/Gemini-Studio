@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { AppMode, ToastMessage } from '../types';
 
@@ -13,6 +14,7 @@ interface UIState {
     isPro: boolean;
     isMobile: boolean;
     isSettingsOpen: boolean;
+    isPreviewCollapsed: boolean;
     
     setMode: (mode: AppMode) => void;
     addToast: (msg: string, type?: 'success'|'error'|'info'|'warning') => void;
@@ -26,6 +28,7 @@ interface UIState {
     togglePro: () => void;
     setIsMobile: (isMobile: boolean) => void;
     setSettingsOpen: (open: boolean) => void;
+    togglePreviewCollapse: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -37,6 +40,7 @@ export const useUIStore = create<UIState>((set) => ({
     isPro: false,
     isMobile: false,
     isSettingsOpen: false,
+    isPreviewCollapsed: false,
 
     setMode: (mode) => set((state) => ({ 
         mode,
@@ -62,5 +66,7 @@ export const useUIStore = create<UIState>((set) => ({
     
     setIsMobile: (isMobile) => set({ isMobile }),
 
-    setSettingsOpen: (open) => set({ isSettingsOpen: open })
+    setSettingsOpen: (open) => set({ isSettingsOpen: open }),
+    
+    togglePreviewCollapse: () => set((state) => ({ isPreviewCollapsed: !state.isPreviewCollapsed }))
 }));
