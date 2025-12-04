@@ -1,6 +1,4 @@
 
-
-
 import { GoogleGenAI, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import { KeyVault } from "./keyVault";
 
@@ -13,7 +11,11 @@ export const MODELS = {
         PRO: 'veo-3.1-generate-preview',
         FAST: 'veo-3.1-fast-generate-preview'
     },
-    TEXT: 'gemini-2.5-flash'
+    TEXT: 'gemini-2.5-flash',
+    ANALYSIS: {
+        PRO: 'gemini-3-pro-preview',
+        FAST: 'gemini-2.5-flash'
+    }
 };
 
 export const SAFETY_SETTINGS = [

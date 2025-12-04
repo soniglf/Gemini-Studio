@@ -1,7 +1,5 @@
 {
   "name": "Gemini Studio",
   "description": "A professional AI tool for generating virtual influencers and product photography using Gemini 3 Pro.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "requestFramePermissions": []
 }

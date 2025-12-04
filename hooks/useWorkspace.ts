@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGenerationStore } from '../stores/generationStore';
 import { useUIStore } from '../stores/uiStore';
 import { GenerationTier, AppMode } from '../types';
@@ -13,34 +13,45 @@ export const useWorkspace = (mode: AppMode.STUDIO | AppMode.INFLUENCER | AppMode
         locationPreviews, isPreviewLoading, fetchPreviews
     } = useGenerationStore();
     
-    const { isPro } = useUIStore();
-    const [tier, setTier] = useState<GenerationTier>(GenerationTier.RENDER);
+    const { isPro, tier } = useUIStore(); // Use global tier
 
-    // DECOUPLED: Select the correct settings store based on the mode
-    const { settings, setSettings } = 
-        mode === AppMode.STUDIO ? useStudioSettingsStore() :
-        mode === AppMode.INFLUENCER ? useInfluencerSettingsStore() :
-        useMotionSettingsStore();
+    // Dynamic Store Selection Strategy
+    const storeSelector = useMemo(() => {
+        if (mode === AppMode.STUDIO) return useStudioSettingsStore;
+        if (mode === AppMode.INFLUENCER) return useInfluencerSettingsStore;
+        return useMotionSettingsStore;
+    }, [mode]);
+
+    // Connect to the specific store
+    // @ts-ignore - Types are compatible for generic settings usage
+    const { settings, setSettings } = storeSelector();
     
-    const location = (settings as any).location || (settings as any).background;
+    // Auto-fetch location previews when relevant fields change
+    const locationKey = (settings as any).location ? 'location' : 'background';
+    const locationValue = (settings as any)[locationKey];
+
+    // Core Reactor: Centralized Side Effect for Previews
     useEffect(() => {
-        if(location) {
-            fetchPreviews();
+        if(locationValue && !locationPreviews.length) {
+            const timer = setTimeout(() => {
+                fetchPreviews();
+            }, 800);
+            return () => clearTimeout(timer);
         }
-    }, [location, fetchPreviews]);
+    }, [locationValue, fetchPreviews]);
 
-    const onGenerate = () => generate(tier);
+    // Use global tier for generation
+    const onGenerate = useCallback(() => generate(tier), [generate, tier]);
 
-    const update = (field: string, value: any) => {
-        setSettings({ ...settings, [field]: value } as any);
-    };
+    const update = useCallback((field: string, value: any) => {
+        (setSettings as any)({ ...settings, [field]: value });
+    }, [settings, setSettings]);
 
     return {
         settings,
         update,
         isPro,
-        tier,
-        setTier,
+        tier, // Return tier for read-only usage if needed
         onGenerate,
         isGenerating,
         locationPreviews,

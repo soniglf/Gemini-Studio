@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { DirectorPlan, DirectorShot, GeneratedAsset, AppMode, ModelAttributes, GenerationTier, GenerationResult, AuditReport } from '../types';
@@ -102,6 +103,7 @@ export const useDirectorStore = create<DirectorState>()(
             executePlan: async () => {
                 const { plan, castModel, intensity, isShooting } = get();
                 const { activeProject } = useProjectStore.getState();
+                const { tier } = useUIStore.getState();
                 const { addTask, updateTask, removeTask } = useTaskManagerStore.getState();
 
                 if (!plan || !activeProject || isShooting) return;
@@ -124,7 +126,7 @@ export const useDirectorStore = create<DirectorState>()(
                 const worker = async (shot: DirectorShot) => {
                     try {
                         set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shot.id ? { ...s, status: 'GENERATING' } : s) }}));
-                        const assetId = await executeSingleShot(shot, fullCastModel, activeProject.id, intensity, activeProject.customInstructions);
+                        const assetId = await executeSingleShot(shot, fullCastModel, activeProject.id, intensity, tier, activeProject.customInstructions);
                         set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shot.id ? { ...s, status: 'DONE', resultAssetId: assetId } : s) }}));
                     } catch (e) {
                         console.error("Shot failed:", e);
@@ -145,6 +147,8 @@ export const useDirectorStore = create<DirectorState>()(
             regenerateShot: async (shotId, feedback) => {
                 const { plan, castModel, intensity } = get();
                 const { activeProject } = useProjectStore.getState();
+                const { tier } = useUIStore.getState();
+
                 if (!plan || !activeProject) return;
 
                 const shot = plan.shots.find(s => s.id === shotId);
@@ -155,7 +159,7 @@ export const useDirectorStore = create<DirectorState>()(
                 set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shotId ? { ...s, status: 'GENERATING', feedback } : s) }}));
                 
                 try {
-                    const assetId = await executeSingleShot(shot, fullCastModel, activeProject.id, intensity, activeProject.customInstructions, feedback);
+                    const assetId = await executeSingleShot(shot, fullCastModel, activeProject.id, intensity, tier, activeProject.customInstructions, feedback);
                     set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shotId ? { ...s, status: 'DONE', resultAssetId: assetId, feedback: undefined } : s) }}));
                 } catch (e) {
                     set(state => ({ plan: { ...state.plan!, shots: state.plan!.shots.map(s => s.id === shotId ? { ...s, status: 'FAILED' } : s) }}));
@@ -204,10 +208,11 @@ export const useDirectorStore = create<DirectorState>()(
                     state?.setPlan(null);
                 }
             },
+            // FIX: Exclude 'plan' from persistence to avoid QuotaExceededError
             partialize: (state) => ({
                 version: state.version,
                 brief: state.brief,
-                plan: state.plan,
+                // plan: state.plan, // DISABLED to prevent storage quota issues
                 intensity: state.intensity,
                 castModel: stripHeavyData(state.castModel)
             })
@@ -215,22 +220,21 @@ export const useDirectorStore = create<DirectorState>()(
     )
 );
 
-async function executeSingleShot(shot: DirectorShot, model: ModelAttributes, projectId: string, intensity: number, projectContext?: string, feedback?: string): Promise<string> {
+async function executeSingleShot(shot: DirectorShot, model: ModelAttributes, projectId: string, intensity: number, tier: GenerationTier, projectContext?: string, feedback?: string): Promise<string> {
     const { settings, mode } = GenerationService.mapShotToSettings(shot, model.visualVibe, intensity, projectContext);
     let result: GenerationResult;
     
-    // [Project Chimera] Using the unified GenerationService compatibility wrappers
     if (mode === AppMode.STUDIO) {
-        result = await GenerationService.generateStudio(model, settings as any, GenerationTier.RENDER, projectContext, feedback);
+        result = await GenerationService.generateStudio(model, settings as any, tier, projectContext, feedback);
     } else {
-        result = await GenerationService.generateInfluencer(model, settings as any, GenerationTier.RENDER, projectContext, feedback);
+        result = await GenerationService.generateInfluencer(model, settings as any, tier, projectContext, feedback);
     }
 
     const asset: GeneratedAsset = {
         id: `asset-${Date.now()}`, projectId, url: result.url, blob: result.blob,
         type: 'IMAGE', prompt: result.finalPrompt, timestamp: Date.now(),
         mode, isMagic: false, modelId: model.id, usedModel: result.usedModel,
-        keyType: result.keyType, tier: result.tier, cost: 0.04, settings, tags: result.tags
+        keyType: result.keyType, tier: result.tier, cost: result.tier === GenerationTier.SKETCH ? 0 : 0.04, settings, tags: result.tags
     };
     
     await useGalleryStore.getState().addAsset(asset);

@@ -25,7 +25,7 @@ export const usePreviewController = (onAssetSelect?: (asset: GeneratedAsset) => 
 
     const activeData = lastGenerated || (assets && assets[0] ? assets[0] : null);
     
-    const activePrompt = (activeData as GeneratedAsset)?.prompt || (activeData as GenerationResult)?.finalPrompt;
+    const activePrompt = (activeData as GeneratedAsset)?.prompt || (activeData as unknown as GenerationResult)?.finalPrompt;
     const activeId = (activeData as GeneratedAsset)?.id;
     
     const previousVersion = activeData && activePrompt?.startsWith('REFINED:') 

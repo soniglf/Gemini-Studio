@@ -1,7 +1,6 @@
-
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { ModelAttributes } from '../types';
+import { ModelAttributes, ModelMorphology } from '../types';
 import { db } from '../services/db';
 import { DEFAULT_MODEL } from '../data/defaults';
 import { useUIStore } from './uiStore';
@@ -140,6 +139,7 @@ export const useModelStore = create<ModelState>()(
                 }));
                 useUIStore.getState().addToast("Profile duplicated", 'success');
             },
+
             deleteProfile: async () => { 
                 const { model, savedModels } = get();
                 if(savedModels.length <= 1) return;
@@ -150,7 +150,6 @@ export const useModelStore = create<ModelState>()(
                 set(state => ({
                     savedModels: remaining,
                     model: remaining[0],
-                    // We don't necessarily need to clear history, but we can
                 }));
                 useUIStore.getState().addToast("Profile deleted", 'success');
             },

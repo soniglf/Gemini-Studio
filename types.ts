@@ -18,7 +18,20 @@ export type Language = 'EN' | 'ES';
 
 export enum Gender { MALE = 'MALE', FEMALE = 'FEMALE' }
 export enum Lighting { SOFTBOX = "Softbox", REMBRANDT = "Rembrandt", NEON = "Neon Cyberpunk", WINDOW = "Natural Window", FLASH = "Hard Flash", GOLDEN = "Golden Hour" }
-export enum ShotType { CLOSE_UP = "Extreme Close-up", HEADSHOT = "Headshot", WAIST = "Waist Up", FULL = "Full Body", LOW_ANGLE = "Low Angle" }
+
+export enum ShotType { 
+  EXTREME_CLOSE_UP = "Extreme Close-Up", 
+  CLOSE_UP = "Close-Up", 
+  MEDIUM_CLOSE_UP = "Medium Close-Up", 
+  MEDIUM_SHOT = "Medium Shot", 
+  COWBOY_SHOT = "Cowboy Shot", 
+  FULL_BODY = "Full Body", 
+  WIDE_SHOT = "Wide Shot", 
+  LOW_ANGLE = "Low Angle", 
+  HIGH_ANGLE = "High Angle", 
+  OVERHEAD = "Overhead" 
+}
+
 export enum TimeOfDay { DAWN = "Dawn", NOON = "Noon", GOLDEN = "Golden Hour", BLUE = "Blue Hour", CITY = "City Lights" }
 export enum Vibe { NATURAL = "Natural", CINEMATIC = "Cinematic", CYBERPUNK = "Cyberpunk", VINTAGE = "Vintage 90s", PORTRA = "Kodak Portra", MOODY = "Moody" }
 
@@ -29,8 +42,8 @@ export interface UsageStats {
   paidVideos: number;
   estimatedCost: number;
   totalTokens: number;
-  storageUsage?: number;
-  storageQuota?: number;
+  storageUsage: number;
+  storageQuota: number;
 }
 
 export interface Project {
@@ -51,48 +64,35 @@ export interface Collection {
 }
 
 export interface ModelMorphology {
-    // Biometrics (Granular)
-    height: number;      // 0-100 (Maps to cm range)
-    bodyFat: number;     // 0-100 (Maps to descriptors: Shredded -> Soft)
-    muscleMass: number;  // 0-100 (Maps to hypertrophy)
-    boneStructure: number; // 0-100 (Frame size: Petite -> Broad)
-    
-    // NEW: Body Proportions
-    shoulderWidth: number; // 0-100 (Narrow -> Broad)
-    legLength: number;     // 0-100 (Short -> Statuesque)
-    neckThickness: number; // 0-100 (Thin -> Bull)
-
-    // Dimorphism
-    bustChest: number;   // 0-100 (Cup size / Chest breadth)
-    hipsWaistRatio: number; // 0-100 (Hourglass / V-Taper intensity)
-    
-    // Facial Architecture (Cranial)
+    height: number;
+    bodyFat: number;
+    muscleMass: number;
+    boneStructure: number;
+    shoulderWidth: number;
+    legLength: number;
+    neckThickness: number;
+    bustChest: number;
+    hipsWaistRatio: number;
     faceShape: 'OVAL' | 'SQUARE' | 'HEART' | 'DIAMOND' | 'ROUND';
-    foreheadHeight: number; // 0-100 (Low -> High)
-    jawlineDefinition: number; // 0-100
-    chinProminence: number; // 0-100 (Recessed -> Jutting)
-    cheekboneHeight: number;   // 0-100
-    
-    // Ocular (Eyes)
+    foreheadHeight: number;
+    jawlineDefinition: number;
+    chinProminence: number;
+    cheekboneHeight: number;
     eyeSize: number;
-    eyeSpacing: number; // 0-100 (Close-set -> Wide-set)
-    eyeTilt: number;    // 0-100 (Downturned -> Cat-eye/Upturned)
-    eyebrowArch: number; // 0-100 (Flat -> High Arch)
-    
-    // Nose & Mouth
-    noseStructure: number; // 0-100
+    eyeSpacing: number;
+    eyeTilt: number;
+    eyebrowArch: number;
+    noseStructure: number;
     lipFullness: number;
-    
-    // The "Titan" Realism Layer (Pro Dermatology Suite)
-    skinTexture: number; // 0-100 (Pore visibility, micro-details)
-    skinSheen: number;   // 0-100 (Matte -> Oily/Dewy)
-    imperfections: number; // 0-100 (Asymmetry, moles, realism)
-    freckleDensity: number; // 0-100 (None -> Heavily Freckled)
-    aging: number; // 0-100 (Youth -> Mature)
-    grayScale: number; // 0-100 (No Gray -> Salt & Pepper -> White)
-    vascularity: number; // 0-100 (Vein visibility)
-    redness: number; // 0-100 (Flush / Blood flow / Subsurface)
-    pores: number; // 0-100 (High frequency detail)
+    skinTexture: number;
+    skinSheen: number;
+    imperfections: number;
+    freckleDensity: number;
+    aging: number;
+    grayScale: number;
+    vascularity: number;
+    redness: number;
+    pores: number;
 }
 
 export interface ModelAttributes {
@@ -102,41 +102,24 @@ export interface ModelAttributes {
   gender: 'MALE' | 'FEMALE';
   age: number;
   ethnicity: string;
-  
   morphology: ModelMorphology;
-
   skinTone: string;
   eyeColor: string;
   hairStyle: string;
   hairColor: string;
-  
-  // New Granular Styling
-  hairTexture: string; // Straight, Wavy, Curly, Coily
-  eyebrowStyle: string; // Plucked, Bushy, Natural
-  
-  // Styling preferences (ephemeral)
+  hairTexture: string;
+  eyebrowStyle: string;
   makeupStyle: string;
   clothingStyle: string;
-  
-  // New granular styling fields
   glasses: string;
   facialHair: string;
   visualVibe: string;
-  
-  // Identity markers
-  distinctiveFeatures: string; // Tattoos, scars
-  
-  // CLONE ENGINE
-  referenceImage: string | null; // Primary Face
-  referenceImages: string[]; // Up to 5 angles
+  distinctiveFeatures: string;
+  referenceImage: string | null;
+  referenceImages: string[];
   accessoriesImage: string | null;
-  strictness: number; // 0-100 (Identity Locking Strength)
-  
-  // PROTOCOL: MIMIC-X
-  // High-density forensic description generated by Vision API
+  strictness: number;
   syntheticDNA?: string;
-  
-  // Legacy support
   bodyType?: string;
 }
 
@@ -155,13 +138,18 @@ export interface ProPhotoSettings {
 
 export interface StudioSettings extends ProPhotoSettings {
   background: string;
+  setDesign: string;
+  props: string;
   backgroundColor: string;
+  studioVibe: string;
+  interactionPreset: string;
   shotType: string;
   aspectRatio: string;
   productDescription: string;
   outfitImage: string | null;
   productImage: string | null;
   propPriority: boolean;
+  focusPriority: 'FACE' | 'OUTFIT' | 'PRODUCT';
   batchSize: number;
   useMagicPrompt: boolean;
   isHighFashion: boolean;
@@ -183,6 +171,12 @@ export interface InfluencerSettings extends ProPhotoSettings {
   aspectRatio: string;
   useMagicPrompt: boolean;
   selectedLocationPreview: string | null;
+  shotFocus: string;
+  prop: string;
+  batchSize: number;
+  socialContext: string;
+  candidness: number;
+  livedIn: boolean;
 }
 
 export interface MotionSettings extends InfluencerSettings {
@@ -259,11 +253,6 @@ export interface AuditReport {
     consistencyCheck: string;
 }
 
-export interface StorageStats {
-    usage: number;
-    quota: number;
-}
-
 export interface Preset {
     id: string;
     name: string;
@@ -271,11 +260,53 @@ export interface Preset {
     settings: Partial<StudioSettings | InfluencerSettings | MotionSettings>;
 }
 
-export interface ProjectExport {
-    version: number;
-    project: Project;
-    models: ModelAttributes[];
-    assets: (Omit<GeneratedAsset, 'blob' | 'url'> & { blobData: string | null })[];
+// --- SYNAPSE II NODE TYPES ---
+
+export enum NodeType {
+    ASSET = 'ASSET',
+    MODIFIER = 'MODIFIER',
+    PENDING = 'PENDING'
+}
+
+export enum ModifierType {
+    CLOTHING = 'CLOTHING',
+    STYLE = 'STYLE',
+    POSE = 'POSE'
+}
+
+export interface ModifierData {
+    prompt: string;
+    referenceImage: string | null;
+}
+
+export interface CanvasItemState {
+    id: string;
+    nodeType: NodeType;
+    assetId?: string; // For ASSET type
+    
+    // Grid Physics
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    zIndex: number;
+    rotation?: number;
+
+    // Modifier Logic
+    modifierType?: ModifierType;
+    modifierData?: ModifierData;
+}
+
+export interface CanvasView {
+    x: number;
+    y: number;
+    scale: number;
+}
+
+export interface CanvasLink {
+    id: string;
+    fromId: string;
+    toId: string;
 }
 
 declare global {

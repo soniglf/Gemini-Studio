@@ -19,12 +19,17 @@ interface GenerationState {
 
     locationPreviews: string[];
     isPreviewLoading: boolean;
+    
+    // Pro Mode Locking
+    lockedKeys: string[];
+    toggleLock: (key: string) => void;
 
     setLastGenerated: (asset: GeneratedAsset | null) => void;
     
     generate: (tier: GenerationTier, feedback?: string) => Promise<void>;
     edit: (original: Blob, mask: Blob, prompt: string) => Promise<void>;
     refine: (asset: GeneratedAsset) => Promise<void>;
+    generateWithModifier: (sourceAsset: GeneratedAsset, modifierNode: any, tier: GenerationTier) => Promise<void>;
     
     toggleIntercept: () => void;
     confirmGeneration: (editedPrompt: string) => void;
@@ -51,9 +56,10 @@ export const useGenerationStore = create<GenerationState>()((set, get) => {
         return prompt;
     };
     
-    const _processAndSaveResult = async (result: GenerationResult, mode: AppMode, model: ModelAttributes, project: Project, settings: any) => {
+    const _processAndSaveResult = async (result: GenerationResult, mode: AppMode, model: ModelAttributes, project: Project, settings: any, pendingId?: string) => {
         const { trackUsage } = useBillingStore.getState();
         const galleryStore = await import('./galleryStore').then(m => m.useGalleryStore.getState());
+        const canvasStore = await import('./canvasStore').then(m => m.useCanvasStore.getState());
         
         const assetType = result.tags?.includes('Video') ? 'VIDEO' : 'IMAGE';
         const assetCost = assetType === 'VIDEO' ? (result.tier === GenerationTier.RENDER ? 0.20 : 0.10) : (result.tier === GenerationTier.RENDER ? 0.04 : 0);
@@ -81,6 +87,11 @@ export const useGenerationStore = create<GenerationState>()((set, get) => {
         await galleryStore.addAsset(asset);
         set({ lastGenerated: asset });
         trackUsage(asset);
+
+        // Update Neural Canvas if a pending node exists
+        if (pendingId) {
+            canvasStore.replaceNode(pendingId, asset.id);
+        }
     };
 
     return {
@@ -90,6 +101,14 @@ export const useGenerationStore = create<GenerationState>()((set, get) => {
         pendingPrompt: null,
         locationPreviews: [],
         isPreviewLoading: false,
+        lockedKeys: [],
+
+        toggleLock: (key) => set(state => {
+            const keys = state.lockedKeys.includes(key) 
+                ? state.lockedKeys.filter(k => k !== key)
+                : [...state.lockedKeys, key];
+            return { lockedKeys: keys };
+        }),
 
         setLastGenerated: (asset) => set({ lastGenerated: asset }),
         toggleIntercept: () => set(state => ({ interceptEnabled: !state.interceptEnabled })),
@@ -99,51 +118,82 @@ export const useGenerationStore = create<GenerationState>()((set, get) => {
             const { model } = useModelStore.getState();
             const { activeProject } = useProjectStore.getState();
             const galleryStore = await import('./galleryStore').then(m => m.useGalleryStore.getState());
+            const canvasStore = await import('./canvasStore').then(m => m.useCanvasStore.getState());
 
             if (!activeProject) { addToast("No Active Campaign", 'error'); return; }
 
             set({ isGenerating: true });
             
-            // [Project Mirage] Create Ghost Asset ID
             const ghostId = `pending-${Date.now()}`;
             
+            // Add visual placeholder to both Gallery and Neural Canvas
+            galleryStore.addPendingAsset({
+                id: ghostId,
+                projectId: activeProject.id,
+                url: "", 
+                type: mode === AppMode.MOTION ? 'VIDEO' : 'IMAGE',
+                prompt: "Generating...",
+                timestamp: Date.now(),
+                mode, isMagic: false, modelId: model.id, usedModel: "PENDING", keyType: "PAID", tier, cost: 0,
+                settings: {}
+            });
+            
+            // Add to Neural Canvas
+            canvasStore.addPendingNode(ghostId);
+            
             try {
-                let settings: any;
+                // FIX: Initialize settings to empty object to prevent Creator mode crash
+                let settings: any = {}; 
+                
                 if (mode === AppMode.STUDIO) settings = useStudioSettingsStore.getState().settings;
                 else if (mode === AppMode.INFLUENCER) settings = useInfluencerSettingsStore.getState().settings;
                 else if (mode === AppMode.MOTION) settings = useMotionSettingsStore.getState().settings;
                 
                 let payload: GenerationPayload = await GenerationService.preparePayload(mode, tier, model, settings, activeProject, feedback);
                 
-                // [Project Mirage] Inject Ghost
-                galleryStore.addPendingAsset({
-                    id: ghostId,
-                    projectId: activeProject.id,
-                    url: "", // No URL yet
-                    type: mode === AppMode.MOTION ? 'VIDEO' : 'IMAGE',
-                    prompt: "Generating...",
-                    timestamp: Date.now(),
-                    mode, isMagic: false, modelId: model.id, usedModel: "PENDING", keyType: "PAID", tier, cost: 0,
-                    settings
-                });
-
                 payload.prompt = await _interceptPrompt(payload.prompt, payload.modelName, tier);
 
-                const sessionId = Date.now().toString();
                 const iterations = payload.batchSize || 1;
                 
                 for (let i = 0; i < iterations; i++) {
                     const result = await GenerationService.generate(payload);
-                    await _processAndSaveResult(result, mode, model, activeProject, settings);
+                    await _processAndSaveResult(result, mode, model, activeProject, settings, ghostId);
                 }
                 
                 if (iterations > 1) addToast(`Batch of ${iterations} generation(s) complete`, 'success');
 
             } catch (e: any) {
                 if (e.message !== "Generation Cancelled") { console.error("Gen Error", e); addToast(e.message || "Gen Failed", 'error'); }
+                // Remove pending node on failure
+                canvasStore.removePendingNode(ghostId);
             } finally {
-                // [Project Mirage] Cleanup Ghost
                 galleryStore.removePendingAsset(ghostId);
+                set({ isGenerating: false });
+            }
+        },
+
+        generateWithModifier: async (sourceAsset, modifierNode, tier) => {
+            const { mode, addToast } = useUIStore.getState();
+            const { model } = useModelStore.getState();
+            const { activeProject } = useProjectStore.getState();
+            const canvasStore = await import('./canvasStore').then(m => m.useCanvasStore.getState());
+            
+            if (!activeProject) return;
+
+            set({ isGenerating: true });
+            const ghostId = `pending-mod-${Date.now()}`;
+            
+            // Add visual placeholder for modifier result
+            canvasStore.addPendingNode(ghostId);
+            
+            try {
+                const result = await GenerationService.generateWithModifier(sourceAsset, modifierNode, tier);
+                await _processAndSaveResult(result, mode, model, activeProject, {}, ghostId);
+                addToast("Modifier Applied", "success");
+            } catch (e: any) {
+                addToast(e.message, 'error');
+                canvasStore.removePendingNode(ghostId);
+            } finally {
                 set({ isGenerating: false });
             }
         },
@@ -157,7 +207,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => {
             set({ isGenerating: true });
             try {
                 const result = await GenerationService.edit(original, mask, prompt);
-                await _processAndSaveResult(result, mode, model, activeProject, {});
+                await _processAndSaveResult(result, mode, model, activeProject, {}, undefined);
                 addToast("Edit Applied", "success");
             } catch (e: any) {
                 addToast(e.message, 'error');
@@ -175,7 +225,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => {
             set({ isGenerating: true });
             try {
                 const result = await GenerationService.refine(asset.blob, asset.prompt);
-                await _processAndSaveResult(result, mode, model, activeProject, asset.settings);
+                await _processAndSaveResult(result, mode, model, activeProject, asset.settings, undefined);
                 addToast("Refinement Complete", "success");
             } catch(e: any) {
                 addToast(e.message, 'error');

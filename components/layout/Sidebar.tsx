@@ -6,6 +6,7 @@ import { useTranslation } from '../../contexts/LanguageContext';
 import { useUIStore } from '../../stores/uiStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useModalStore } from '../../stores/modalStore';
+import { SoniNewMediaLogo } from '../icons/SoniLogo';
 
 interface NavItemProps {
     mode: AppMode;
@@ -79,7 +80,7 @@ export const Sidebar: React.FC = memo(() => {
             `}>
                 <div>
                     <div className="h-20 flex items-center justify-between px-6 border-b border-white/5 gap-3 group">
-                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setMode(AppMode.DIRECTOR)}>
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setMode(AppMode.CREATOR)}>
                             <div className="w-8 h-8 bg-gradient-to-br from-[var(--neon-primary)] to-[var(--neon-secondary)] rounded-lg flex items-center justify-center shadow-[0_0_15px_var(--neon-primary)] group-hover:shadow-[0_0_25px_var(--neon-primary)] transition-all duration-500 relative overflow-hidden">
                                 <Sparkles size={18} className="text-white fill-current animate-pulse relative z-10" />
                                 <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 rotate-45"></div>
@@ -139,13 +140,12 @@ export const Sidebar: React.FC = memo(() => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto py-2 px-2 space-y-2 custom-scrollbar">
-                        <NavItem mode={AppMode.DIRECTOR} current={mode} icon={Clapperboard} label={t('NAV_DIRECTOR')} setMode={setMode} />
-                        <div className="h-px bg-white/10 my-2 mx-4"></div>
                         <NavItem mode={AppMode.CREATOR} current={mode} icon={User} label={t('NAV_CREATOR')} setMode={setMode} />
                         <NavItem mode={AppMode.STUDIO} current={mode} icon={Camera} label={t('NAV_STUDIO')} setMode={setMode} />
                         <NavItem mode={AppMode.INFLUENCER} current={mode} icon={Globe} label={t('NAV_INFLUENCER')} setMode={setMode} />
                         <NavItem mode={AppMode.MOTION} current={mode} icon={Film} label={t('NAV_MOTION')} setMode={setMode} />
-                        <div className="h-px bg-white/10 my-4 mx-2"></div>
+                        <div className="h-px bg-white/10 my-2 mx-4"></div>
+                        <NavItem mode={AppMode.DIRECTOR} current={mode} icon={Clapperboard} label={t('NAV_DIRECTOR')} setMode={setMode} />
                         <NavItem mode={AppMode.GALLERY} current={mode} icon={Layers} label={t('NAV_GALLERY')} setMode={setMode} />
                         <NavItem mode={AppMode.BILLING} current={mode} icon={CreditCard} label={t('NAV_BILLING')} setMode={setMode} />
                     </div>
@@ -161,14 +161,9 @@ export const Sidebar: React.FC = memo(() => {
                             <Languages size={14} /><span>{language === 'EN' ? 'English' : 'Español'}</span>
                         </button>
                     </div>
-                    <div className="px-6 pb-6 pt-2 opacity-40 hover:opacity-100 transition-opacity duration-500 cursor-default group">
-                        <div className="flex flex-col leading-none select-none">
-                            <div className="flex items-center gap-2">
-                                <svg width="28" height="18" viewBox="0 0 28 18" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0"><circle cx="9" cy="9" r="9" fill="white"/><path fillRule="evenodd" clipRule="evenodd" d="M19 9C19 13.9706 14.9706 18 10 18C5.02944 18 1 13.9706 1 9C1 4.02944 5.02944 0 10 0C14.9706 0 19 4.02944 19 9ZM14 9C14 11.7614 11.7614 14 9 14C6.23858 14 4 11.7614 4 9C4 6.23858 6.23858 4 9 4C11.7614 4 14 6.23858 14 9Z" fill="white" style={{ mixBlendMode: 'exclusion' }}/><circle cx="19" cy="9" r="9" fill="white" style={{ mixBlendMode: 'exclusion' }}/></svg>
-                                <span className="font-black text-xl tracking-tighter text-white relative top-[1px]">soni</span>
-                            </div>
-                            <span className="text-[8px] font-medium tracking-[0.3em] text-white/60 ml-9 mt-0.5 group-hover:text-white transition-colors">new media</span>
-                        </div>
+                    {/* CUSTOM LOGO INTEGRATION */}
+                    <div className="px-6 pb-6 pt-2 opacity-40 hover:opacity-100 transition-opacity duration-500 cursor-default group flex justify-center">
+                        <SoniNewMediaLogo className="w-24 h-24 text-white group-hover:text-white/90 transition-colors" />
                     </div>
                 </div>
             </div>

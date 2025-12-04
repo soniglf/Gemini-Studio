@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '../../components/UI';
-import { Stars, Dices, Zap, Wand2 } from 'lucide-react';
+import { Stars, Dices, Zap, Wand2, Flame, Sparkles } from 'lucide-react';
 import { useModelStore } from '../../stores/modelStore';
 import { useUIStore } from '../../stores/uiStore';
 import { GenerationService } from '../../services/ai/generationService';
@@ -45,37 +45,79 @@ export const MuseEngine: React.FC = () => {
     const handleRandomize = () => setMusePrompt(GenerationService.generateRandomPersona());
     const handleMutation = (trait: string) => setMusePrompt(GenerationService.injectTrait(musePrompt, trait));
 
+    const isMale = model.gender === 'MALE';
+    const engineName = isMale ? "Apollo Engine" : "Muse Engine";
+    const accentIcon = isMale ? <Flame size={14} className="text-blue-400" /> : <Stars size={14} className="text-pink-400" />;
+    const borderFocus = isMale ? "focus:border-blue-500/50" : "focus:border-pink-500/50";
+    const buttonClass = isMale 
+        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 shadow-lg shadow-blue-900/30' 
+        : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 shadow-lg shadow-pink-900/30';
+
+    // Professional / Editorial Placeholders
+    const placeholder = isMale
+        ? "Describe the subject's essence (e.g. 'A sophisticated architect with silver fox hair, wearing a turtleneck, shot on 35mm')..."
+        : "Describe the subject's essence (e.g. 'A statuesque editorial model with freckles, wearing haute couture, cinematic lighting')...";
+
     return (
-        <div className="mx-4 relative group animate-in slide-in-from-top-4">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 rounded-2xl opacity-20 group-hover:opacity-50 transition duration-500 blur-sm"></div>
-            <div className="relative bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col gap-3 shadow-xl backdrop-blur-xl">
-                <div className="flex items-center justify-between px-1">
+        <div className="mx-4 mb-6 relative group animate-in slide-in-from-top-4">
+            {/* Restored Magical Glow */}
+            <div className={`absolute -inset-0.5 bg-gradient-to-r ${isMale ? 'from-blue-500 via-cyan-500 to-blue-600' : 'from-pink-500 via-purple-500 to-pink-600'} rounded-2xl blur opacity-30 group-hover:opacity-75 transition duration-1000 group-hover:duration-200 animate-tilt`}></div>
+
+            <div className="relative bg-[#0B1121]/80 backdrop-blur-xl rounded-2xl p-1 border border-white/10 shadow-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
                     <div className="flex items-center gap-2">
-                        <Stars size={12} className="text-purple-400 animate-pulse" />
-                        <span className="text-[10px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase tracking-widest">Muse Engine</span>
+                        {accentIcon}
+                        <span className="text-[10px] font-bold text-white uppercase tracking-[0.2em] shadow-black drop-shadow-md">{engineName}</span>
                     </div>
-                    <button onClick={handleRandomize} className="text-[9px] flex items-center gap-1 text-white/40 hover:text-emerald-400" title="Generate Random Persona">
-                        <Dices size={10}/> Surprise Me
+                    <button
+                        onClick={handleRandomize}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors group/dice"
+                    >
+                        <Dices size={12} className="text-white/30 group-hover/dice:text-emerald-400 transition-colors"/>
+                        <span className="text-[9px] font-bold text-white/30 group-hover/dice:text-white transition-colors">RANDOMIZE</span>
                     </button>
                 </div>
-                
-                <div className="flex gap-2">
-                    <textarea 
+
+                {/* Input Area */}
+                <div className="p-4 flex gap-3">
+                    <textarea
                         value={musePrompt}
                         onChange={(e) => setMusePrompt(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSynthesize()}
-                        placeholder="Describe your vision (e.g. 'A futuristic hacker with neon hair')..."
-                        className="flex-1 bg-slate-900/50 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-pink-500/30 h-24 p-3"
+                        placeholder={placeholder}
+                        className={`flex-1 bg-black/40 border border-white/10 rounded-xl text-xs leading-relaxed text-white placeholder:text-white/20 focus:outline-none ${borderFocus} focus:bg-black/60 h-24 p-4 resize-none transition-all custom-scrollbar`}
                     />
-                    <div className="flex flex-col gap-2">
-                        <Button onClick={handleSynthesize} isLoading={isSynthesizing} disabled={!musePrompt.trim()} className="flex-1 bg-gradient-to-br from-pink-600 to-purple-700 w-14" title="Synthesize"><Zap size={20} /></Button>
-                        <Button onClick={handleEnhance} isLoading={isEnhancing} disabled={!musePrompt.trim()} className="flex-1 bg-white/5 w-14 text-purple-400" title="Auto-Expand"><Wand2 size={18} /></Button>
+
+                    {/* Action Stack */}
+                    <div className="flex flex-col gap-2 w-12 shrink-0">
+                        <button
+                            onClick={handleSynthesize}
+                            disabled={isSynthesizing || !musePrompt.trim()}
+                            className={`flex-1 rounded-xl flex items-center justify-center transition-all duration-300 text-white ${!musePrompt.trim() ? 'bg-white/5 text-white/10 cursor-not-allowed' : buttonClass}`}
+                            title="Synthesize Profile"
+                        >
+                            {isSynthesizing ? <Zap size={16} className="animate-pulse"/> : <Zap size={18} className="fill-current"/>}
+                        </button>
+                        <button
+                            onClick={handleEnhance}
+                            disabled={isEnhancing || !musePrompt.trim()}
+                            className={`h-10 rounded-xl flex items-center justify-center border transition-all duration-300 ${!musePrompt.trim() ? 'border-white/5 text-white/10' : 'border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-emerald-400'}`}
+                            title="Enhance Prompt with AI"
+                        >
+                            <Wand2 size={14} className={isEnhancing ? "animate-spin" : ""} />
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                {/* Quick Traits */}
+                <div className="px-4 pb-3 pt-1 flex flex-wrap gap-2">
                     {MUTATION_TRAITS.map((trait, i) => (
-                        <button key={i} onClick={() => handleMutation(trait.prompt)} className="px-2 py-1 rounded bg-white/5 hover:bg-purple-500/20 text-[9px] font-bold text-white/50 hover:text-purple-300">
+                        <button
+                            key={i}
+                            onClick={() => handleMutation(trait.prompt)}
+                            className="px-2 py-1 rounded-md border border-white/5 bg-white/[0.02] hover:bg-white/10 text-[9px] font-medium text-white/40 hover:text-white transition-all hover:border-white/20"
+                        >
                             + {trait.label}
                         </button>
                     ))}

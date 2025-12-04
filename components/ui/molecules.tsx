@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { ChevronDown, Check, Upload, ZoomIn, Mic, MicOff, Loader2, Cloud, Sliders, ChevronRight, AlertCircle, X } from 'lucide-react';
+import { ChevronDown, Check, Upload, ZoomIn, Mic, MicOff, Loader2, Cloud, Sliders, ChevronRight, AlertCircle, X, Copy } from 'lucide-react';
 import { Label } from './atoms';
 import { RichOption } from './types';
 import { useSpeech } from '../../hooks/useSpeech';
@@ -8,6 +8,7 @@ import { ImageOptimizer } from '../../services/utils/imageOptimizer';
 import { useUIStore } from '../../stores/uiStore';
 import { GoogleDriveService } from '../../services/integrations/googleDrive';
 
+// ... [DebouncedInput, TextArea, VisualGridSelect remain unchanged] ...
 export const DebouncedInput: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string, delay?: number }> = memo(({ label, value, onChange, delay = 800, className, ...props }) => {
     const [localValue, setLocalValue] = useState(value);
     const [isFocused, setIsFocused] = useState(false);
@@ -88,7 +89,6 @@ export const TextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement
     const { addToast } = useUIStore();
     const [isFocused, setIsFocused] = useState(false);
 
-    // Smart Character Counter
     const currentLength = String(value || "").length;
     const isNearLimit = maxLength && currentLength > maxLength * 0.9;
     const limitColor = isNearLimit ? 'text-red-400' : 'text-white/20';
@@ -153,7 +153,7 @@ export const TextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement
     );
 });
 
-export const VisualGridSelect: React.FC<{ label: string, options: (string | RichOption)[], value: string, onChange: (e: { target: { value: string } }) => void, placeholder?: string }> = memo(({ label, options, value, onChange, placeholder = "Select..." }) => {
+export const VisualGridSelect: React.FC<{ label: string, options: (string | RichOption)[], value: string, onChange: (e: { target: { value: string } }) => void, placeholder?: string, editable?: boolean }> = memo(({ label, options, value, onChange, placeholder = "Select...", editable = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
@@ -178,18 +178,22 @@ export const VisualGridSelect: React.FC<{ label: string, options: (string | Rich
         const val = typeof opt === 'string' ? opt : opt.value;
         onChange({ target: { value: val } });
         setIsOpen(false);
-        const btn = containerRef.current?.querySelector('button');
-        if(btn) btn.focus();
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(e);
+        // Optional: Open dropdown on type
+        // if (!isOpen) setIsOpen(true);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if ((e.key === 'Enter' || e.key === ' ') && !editable) {
             e.preventDefault();
             setIsOpen(!isOpen);
         } else if (e.key === 'Escape') {
             setIsOpen(false);
         } else if (e.key === 'ArrowDown') {
-             e.preventDefault();
+             if(!editable) e.preventDefault();
              if(!isOpen) setIsOpen(true);
         }
     };
@@ -202,65 +206,89 @@ export const VisualGridSelect: React.FC<{ label: string, options: (string | Rich
             <label className={`text-[10px] font-bold uppercase tracking-[0.2em] ml-1 mb-2 block transition-colors duration-300 ${isOpen ? 'text-pink-400' : 'text-pink-300/80'}`}>
                 {label}
             </label>
-            <button 
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                onKeyDown={handleKeyDown}
-                aria-haspopup="listbox"
-                aria-expanded={isOpen}
-                aria-label={label}
-                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-4 py-3 text-left text-white flex justify-between items-center hover:bg-slate-800/80 hover:border-pink-500/30 transition-all focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 shadow-sm"
-            >
-                <div className="flex items-center gap-3 overflow-hidden">
-                    {typeof currentOpt !== 'string' && currentOpt?.visual && (
-                        <div className="w-4 h-4 rounded-full border border-white/20" style={{ background: currentOpt.visual }}></div>
-                    )}
-                    <span className="truncate font-light">{displayLabel || placeholder}</span>
-                </div>
-                <ChevronDown size={14} className={`text-white/30 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
             
-            {isOpen && (
-                <div 
-                    ref={listRef}
-                    role="listbox" 
-                    className="absolute top-[110%] left-0 w-full bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-2 z-[9999] animate-in fade-in zoom-in-95 duration-200"
-                >
-                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
-                        {safeOptions.map((opt, idx) => {
-                            const isRich = typeof opt !== 'string';
-                            const val = isRich ? (opt as RichOption).value : (opt as string);
-                            const label = isRich ? (opt as RichOption).label : (opt as string);
-                            const visual = isRich ? (opt as RichOption).visual : null;
-                            const isSelected = value === val;
-                            return (
-                                <div 
-                                    key={idx} 
-                                    role="option"
-                                    aria-selected={isSelected}
-                                    onClick={() => handleSelect(opt)}
-                                    className={`relative p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-1.5 ${isSelected ? 'bg-pink-500/10 border-pink-500/50' : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/5'}`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                             {visual && <div className="w-3 h-3 rounded-full border border-white/10" style={{ background: visual }}></div>}
-                                             <span className={`text-xs font-bold ${isSelected ? 'text-pink-400' : 'text-slate-200'}`}>{label}</span>
-                                        </div>
-                                        {isSelected && <Check size={12} className="text-pink-500" />}
-                                    </div>
-                                    {isRich && (opt as RichOption).desc && <p className="text-[9px] text-white/40 leading-tight">{(opt as RichOption).desc}</p>}
-                                </div>
-                            );
-                        })}
+            <div className="relative">
+                {editable ? (
+                    <div className="relative flex items-center">
+                        <input
+                            className={`w-full bg-slate-800/50 border border-white/10 rounded-lg pl-4 pr-10 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-pink-500/50 focus:bg-slate-800/80 transition-all font-light ${isOpen ? 'border-pink-500/30' : ''}`}
+                            value={value}
+                            onChange={handleInputChange}
+                            onFocus={() => setIsOpen(true)}
+                            placeholder={placeholder}
+                            onKeyDown={handleKeyDown}
+                        />
+                        <button 
+                            type="button"
+                            onClick={() => setIsOpen(!isOpen)}
+                            className="absolute right-0 top-0 bottom-0 px-3 text-white/30 hover:text-white flex items-center justify-center transition-colors"
+                        >
+                            <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
                     </div>
-                </div>
-            )}
+                ) : (
+                    <button 
+                        type="button"
+                        onClick={() => setIsOpen(!isOpen)}
+                        onKeyDown={handleKeyDown}
+                        aria-haspopup="listbox"
+                        aria-expanded={isOpen}
+                        aria-label={label}
+                        className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-4 py-3 text-left text-white flex justify-between items-center hover:bg-slate-800/80 hover:border-pink-500/30 transition-all focus:outline-none focus:border-pink-500/50 focus:ring-1 focus:ring-pink-500/50 shadow-sm"
+                    >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            {typeof currentOpt !== 'string' && currentOpt?.visual && (
+                                <div className="w-4 h-4 rounded-full border border-white/20" style={{ background: currentOpt.visual }}></div>
+                            )}
+                            <span className="truncate font-light">{displayLabel || placeholder}</span>
+                        </div>
+                        <ChevronDown size={14} className={`text-white/30 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                )}
+                
+                {isOpen && (
+                    <div 
+                        ref={listRef}
+                        role="listbox" 
+                        className="absolute top-[110%] left-0 w-full bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-2 z-[9999] animate-in fade-in zoom-in-95 duration-200"
+                    >
+                        <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
+                            {safeOptions.map((opt, idx) => {
+                                const isRich = typeof opt !== 'string';
+                                const val = isRich ? (opt as RichOption).value : (opt as string);
+                                const label = isRich ? (opt as RichOption).label : (opt as string);
+                                const visual = isRich ? (opt as RichOption).visual : null;
+                                const isSelected = value === val;
+                                return (
+                                    <div 
+                                        key={idx} 
+                                        role="option"
+                                        aria-selected={isSelected}
+                                        onClick={() => handleSelect(opt)}
+                                        className={`relative p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-1.5 ${isSelected ? 'bg-pink-500/10 border-pink-500/50' : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/5'}`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                 {visual && <div className="w-3 h-3 rounded-full border border-white/10" style={{ background: visual }}></div>}
+                                                 <span className={`text-xs font-bold ${isSelected ? 'text-pink-400' : 'text-slate-200'}`}>{label}</span>
+                                            </div>
+                                            {isSelected && <Check size={12} className="text-pink-500" />}
+                                        </div>
+                                        {isRich && (opt as RichOption).desc && <p className="text-[9px] text-white/40 leading-tight">{(opt as RichOption).desc}</p>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 });
 
-export const ImageUpload: React.FC<{ label: string, value: string | null, onChange: (val: string | null) => void, compact?: boolean }> = memo(({ label, value, onChange, compact }) => {
+export const ImageUpload: React.FC<{ label: string, value: string | null, onChange: (val: string | null) => void, compact?: boolean, className?: string }> = memo(({ label, value, onChange, compact, className }) => {
     const [isOptimizing, setIsOptimizing] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const { addToast } = useUIStore();
 
     const processFile = async (file: File) => {
@@ -301,10 +329,46 @@ export const ImageUpload: React.FC<{ label: string, value: string | null, onChan
         }
     };
 
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            await processFile(file);
+        } else {
+            addToast("Please drop an image file", 'warning');
+        }
+    };
+
+    const handlePaste = async (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf("image") !== -1) {
+                const file = items[i].getAsFile();
+                if(file) await processFile(file);
+                return;
+            }
+        }
+    };
+
     return (
-        <div className="flex flex-col mb-6 w-full">
+        <div className={`flex flex-col w-full ${className !== undefined ? className : 'mb-6'}`}>
              <div className="flex items-center justify-between mb-2">
-                <Label>{label}</Label>
+                {label && <Label>{label}</Label>}
                 {process.env.GOOGLE_CLIENT_ID && (
                     <button 
                         onClick={handleDrivePick}
@@ -325,13 +389,26 @@ export const ImageUpload: React.FC<{ label: string, value: string | null, onChan
                  </div>
              ) : (
                 <div className="flex gap-2">
-                    <label className={`flex-1 flex flex-col items-center justify-center ${compact ? 'h-24' : 'w-24 h-24'} border border-white/10 border-dashed rounded-lg cursor-pointer bg-slate-800/30 hover:border-pink-500/50 transition-all group relative overflow-hidden`}>
+                    <label 
+                        className={`
+                            flex-1 flex flex-col items-center justify-center ${compact ? 'h-24' : 'w-24 h-24'} 
+                            border-2 border-dashed rounded-lg cursor-pointer transition-all group relative overflow-hidden outline-none
+                            ${isDragging ? 'border-pink-500 bg-pink-500/10' : 'border-white/10 bg-slate-800/30 hover:border-pink-500/50 hover:bg-slate-800/50'}
+                        `}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onPaste={handlePaste}
+                        tabIndex={0}
+                    >
                         {isOptimizing ? (
                             <Loader2 className="w-5 h-5 text-pink-400 animate-spin" />
                         ) : (
                             <>
-                                <Upload className="w-5 h-5 text-white/20 group-hover:text-pink-400 transition-colors" />
-                                <span className="text-[9px] text-white/20 mt-2 uppercase tracking-widest">Upload</span>
+                                <Upload className={`w-5 h-5 transition-colors ${isDragging ? 'text-pink-400' : 'text-white/20 group-hover:text-pink-400'}`} />
+                                <span className={`text-[9px] mt-2 uppercase tracking-widest transition-colors ${isDragging ? 'text-pink-300' : 'text-white/20'}`}>
+                                    {isDragging ? 'Drop' : 'Drop or Paste'}
+                                </span>
                             </>
                         )}
                         <input type="file" className="hidden" accept="image/*" onChange={handleFile} disabled={isOptimizing} />
@@ -342,6 +419,7 @@ export const ImageUpload: React.FC<{ label: string, value: string | null, onChan
     );
 });
 
+// ... [VisualAspectSelect, ZoomableImage, BiometricSlider, SliderGroup remain unchanged] ...
 export const VisualAspectSelect: React.FC<{ value: string; onChange: (val: string) => void; label: string }> = memo(({ value, onChange, label }) => {
     const aspects = [{ id: "1:1", w: 8, h: 8 }, { id: "3:4", w: 9, h: 12 }, { id: "16:9", w: 16, h: 9 }, { id: "9:16", w: 9, h: 16 }];
     return (
@@ -359,7 +437,7 @@ export const VisualAspectSelect: React.FC<{ value: string; onChange: (val: strin
     );
 });
 
-export const ZoomableImage = ({ src, className }: { src: string, className?: string }) => {
+export const ZoomableImage = ({ src, className, onZoomChange }: { src: string, className?: string, onZoomChange?: (zoomed: boolean) => void }) => {
     const [isZoomed, setIsZoomed] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const imgRef = useRef<HTMLImageElement>(null);
@@ -372,12 +450,17 @@ export const ZoomableImage = ({ src, className }: { src: string, className?: str
         setPosition({ x, y });
     };
 
+    const handleToggle = () => {
+        const newState = !isZoomed;
+        setIsZoomed(newState);
+        if (onZoomChange) onZoomChange(newState);
+    };
+
     return (
         <div 
             className={`relative overflow-hidden cursor-zoom-in group ${className}`}
             onMouseMove={handleMouseMove}
-            onClick={() => setIsZoomed(!isZoomed)}
-            onMouseLeave={() => setIsZoomed(false)}
+            onClick={handleToggle}
         >
             <img 
                 ref={imgRef}
@@ -398,7 +481,7 @@ export const ZoomableImage = ({ src, className }: { src: string, className?: str
             {!isZoomed && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-black/50 p-2 rounded-full backdrop-blur"><ZoomIn className="text-white"/></div>}
         </div>
     );
-};
+});
 
 export const BiometricSlider: React.FC<{ label: string, value: number, onChange: (v: number) => void, min?: number, max?: number, unit?: string, leftLabel?: string, rightLabel?: string, formatValue?: (v:number) => string }> = memo(({ label, value, onChange, min = 0, max = 100, unit = '%', leftLabel, rightLabel, formatValue }) => {
     // Smart Display
@@ -442,7 +525,7 @@ export const BiometricSlider: React.FC<{ label: string, value: number, onChange:
                 {/* Track */}
                 <div className="absolute w-full h-1 bg-black/40 border border-white/5 rounded-full overflow-hidden group-hover/track:h-1.5 transition-all duration-300 shadow-inner">
                     <div 
-                        className={`h-full bg-gradient-to-r ${getGradient()} transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1.0)]`} 
+                        className={`h-full bg-gradient-to-r ${getGradient()} transition-all duration-75 ease-out`} 
                         style={{ width: `${((value - min) / (max - min)) * 100}%` }}
                     />
                 </div>
@@ -463,9 +546,9 @@ export const BiometricSlider: React.FC<{ label: string, value: number, onChange:
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 
-                {/* Haptic Thumb Visual - With Glide Physics */}
+                {/* Haptic Thumb Visual - Fast Physics */}
                 <div 
-                    className="absolute h-3 w-3 bg-[#0B1121] border border-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] group-hover/track:scale-125 group-active/track:scale-150 group-active/track:border-pink-400 group-active/track:shadow-[0_0_15px_rgba(236,72,153,0.8)]"
+                    className="absolute h-3 w-3 bg-[#0B1121] border border-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none transition-all duration-75 ease-out group-hover/track:scale-125 group-active/track:scale-150 group-active/track:border-pink-400 group-active/track:shadow-[0_0_15px_rgba(236,72,153,0.8)]"
                     style={{ left: `calc(${((value - min) / (max - min)) * 100}% - 6px)` }}
                 />
             </div>

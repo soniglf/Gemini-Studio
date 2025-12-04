@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { StudioSettings } from '../types';
 import { INITIAL_STUDIO } from '../data/defaults';
 
-const STUDIO_SETTINGS_VERSION = 1;
+const STUDIO_SETTINGS_VERSION = 2; // Bumped version for new schema
 
 interface StudioSettingsState {
     version: number;

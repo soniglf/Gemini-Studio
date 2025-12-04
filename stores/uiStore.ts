@@ -1,9 +1,9 @@
-
 import { create } from 'zustand';
-import { AppMode, ToastMessage } from '../types';
+import { AppMode, ToastMessage, GenerationTier } from '../types';
 
 interface UIState {
     mode: AppMode;
+    tier: GenerationTier;
     toasts: ToastMessage[];
     mobileTab: 'EDITOR' | 'PREVIEW';
     previewTab: 'ASSET' | 'BIO';
@@ -11,9 +11,11 @@ interface UIState {
     isPro: boolean;
     isMobile: boolean;
     isPreviewCollapsed: boolean;
+    isPreviewFullScreen: boolean;
     isSidebarOpen: boolean;
     
     setMode: (mode: AppMode) => void;
+    setTier: (tier: GenerationTier) => void;
     addToast: (msg: string, type?: 'success'|'error'|'info'|'warning') => void;
     removeToast: (id: string) => void;
     setMobileTab: (tab: 'EDITOR' | 'PREVIEW') => void;
@@ -22,26 +24,32 @@ interface UIState {
     togglePro: () => void;
     setIsMobile: (isMobile: boolean) => void;
     togglePreviewCollapse: () => void;
+    togglePreviewFullScreen: () => void;
     toggleSidebar: () => void;
     setSidebarOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
-    mode: AppMode.DIRECTOR,
+    mode: AppMode.CREATOR,
+    tier: GenerationTier.SKETCH, // Default to Sketch for cost safety
     toasts: [],
     mobileTab: 'EDITOR',
-    previewTab: 'ASSET',
+    previewTab: 'BIO',
     bioFocus: 'BODY',
     isPro: false,
     isMobile: false,
     isPreviewCollapsed: false,
+    isPreviewFullScreen: false,
     isSidebarOpen: false,
 
     setMode: (mode) => set((state) => ({ 
         mode,
         previewTab: mode === AppMode.CREATOR ? 'BIO' : 'ASSET',
-        isSidebarOpen: false // Auto-close on mobile nav
+        isSidebarOpen: false,
+        isPreviewFullScreen: false
     })),
+
+    setTier: (tier) => set({ tier }),
     
     addToast: (message, type = 'info') => {
         const id = Date.now().toString();
@@ -62,6 +70,7 @@ export const useUIStore = create<UIState>((set) => ({
     setIsMobile: (isMobile) => set({ isMobile }),
     
     togglePreviewCollapse: () => set((state) => ({ isPreviewCollapsed: !state.isPreviewCollapsed })),
+    togglePreviewFullScreen: () => set((state) => ({ isPreviewFullScreen: !state.isPreviewFullScreen })),
     
     toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
     setSidebarOpen: (open) => set({ isSidebarOpen: open })

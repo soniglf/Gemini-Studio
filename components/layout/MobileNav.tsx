@@ -11,11 +11,11 @@ export const MobileNav: React.FC = memo(() => {
     return (
         <div className="fixed bottom-0 w-full h-20 bg-[#030712]/95 backdrop-blur-xl border-t border-white/10 grid grid-cols-7 items-center px-1 z-50 lg:hidden pb-[env(safe-area-inset-bottom)] overflow-x-auto">
             {[
-                { m: AppMode.DIRECTOR, i: Clapperboard, l: t('NAV_DIRECTOR') },
                 { m: AppMode.CREATOR, i: User, l: t('NAV_CREATOR') }, 
                 { m: AppMode.STUDIO, i: Camera, l: t('NAV_STUDIO') },
                 { m: AppMode.INFLUENCER, i: Globe, l: t('NAV_INFLUENCER') }, 
                 { m: AppMode.MOTION, i: Film, l: t('NAV_MOTION') },
+                { m: AppMode.DIRECTOR, i: Clapperboard, l: t('NAV_DIRECTOR') },
                 { m: AppMode.GALLERY, i: Layers, l: t('NAV_GALLERY') },
                 { m: AppMode.BILLING, i: CreditCard, l: t('NAV_BILLING') }
             ].map(x => (

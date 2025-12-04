@@ -1,4 +1,3 @@
-
 import { ModelAttributes, StudioSettings, InfluencerSettings, MotionSettings, Lighting, ShotType, TimeOfDay, Vibe, ModelMorphology } from '../types';
 
 export const DEFAULT_MORPHOLOGY: ModelMorphology = {
@@ -30,21 +29,21 @@ export const DEFAULT_MORPHOLOGY: ModelMorphology = {
     noseStructure: 50,
     lipFullness: 50,
     
-    // Dermatology & Aging
-    skinTexture: 70, // Realistic pores
-    skinSheen: 50,   // Natural moisture
-    imperfections: 30, // Natural asymmetry
+    // Dermatology & Aging (Updated Defaults)
+    skinTexture: 65, // Updated baseline as requested
+    skinSheen: 50,   
+    imperfections: 40, // Slightly higher to match texture
     freckleDensity: 0, 
     aging: 24,
     grayScale: 0,
-    vascularity: 10,
-    redness: 20,
-    pores: 50
+    vascularity: 15,
+    redness: 25, // Natural flush
+    pores: 60    // Visible texture
 };
 
 export const DEFAULT_MODEL: ModelAttributes = {
   id: "default",
-  version: 4, // Bump version
+  version: 5, // Bump version
   name: "New Model",
   gender: "FEMALE",
   age: 24,
@@ -53,11 +52,11 @@ export const DEFAULT_MODEL: ModelAttributes = {
   
   hairStyle: "Long wavy",
   hairColor: "Brunette",
-  hairTexture: "Wavy", // New
-  eyebrowStyle: "Natural", // New
+  hairTexture: "Wavy", 
+  eyebrowStyle: "Natural", 
   
   eyeColor: "Hazel",
-  clothingStyle: "Minimalist",
+  clothingStyle: "Black Underwear", // Updated Default
   
   glasses: "None",
   facialHair: "None",
@@ -71,7 +70,7 @@ export const DEFAULT_MODEL: ModelAttributes = {
   referenceImage: null,
   referenceImages: [], 
   accessoriesImage: null,
-  strictness: 65
+  strictness: 100 // Updated Default
 };
 
 export const INITIAL_PRO_SETTINGS = { 
@@ -80,6 +79,49 @@ export const INITIAL_PRO_SETTINGS = {
     seed: undefined, customNegative: "" 
 };
 
-export const INITIAL_STUDIO: StudioSettings = { ...INITIAL_PRO_SETTINGS, background: "Studio White", backgroundColor: "#FFFFFF", shotType: ShotType.WAIST, productDescription: "", outfitImage: null, productImage: null, propPriority: false, batchSize: 1, isHighFashion: false, poseStyle: "Power Stance", editorialVibe: "Vogue", lighting: Lighting.SOFTBOX, useMagicPrompt: true, aspectRatio: "3:4", selectedLocationPreview: null };
-export const INITIAL_INFLUENCER: InfluencerSettings = { ...INITIAL_PRO_SETTINGS, action: "Walking", location: "Paris", timeOfDay: TimeOfDay.GOLDEN, cameraAngle: "Eye Level", clothingOverride: "", outfitImage: null, companions: "", vibe: Vibe.NATURAL, aspectRatio: "4:5", useMagicPrompt: true, selectedLocationPreview: null };
+export const INITIAL_STUDIO: StudioSettings = { 
+    ...INITIAL_PRO_SETTINGS, 
+    background: "", 
+    setDesign: "Seamless Paper Only",
+    props: "",
+    backgroundColor: "#FFFFFF", 
+    studioVibe: "High Fashion",
+    interactionPreset: "Standing Confidently",
+    shotType: ShotType.MEDIUM_SHOT, 
+    productDescription: "", 
+    outfitImage: null, 
+    productImage: null, 
+    propPriority: false, 
+    focusPriority: 'FACE', 
+    batchSize: 1, 
+    isHighFashion: false, 
+    poseStyle: "", 
+    editorialVibe: "", 
+    lighting: Lighting.SOFTBOX, 
+    useMagicPrompt: true, 
+    aspectRatio: "3:4", 
+    selectedLocationPreview: null 
+};
+
+export const INITIAL_INFLUENCER: InfluencerSettings = { 
+    ...INITIAL_PRO_SETTINGS, 
+    action: "Walking", 
+    location: "Paris", 
+    timeOfDay: TimeOfDay.GOLDEN, 
+    cameraAngle: "Eye Level", 
+    clothingOverride: "", 
+    outfitImage: null, 
+    companions: "", 
+    vibe: Vibe.NATURAL, 
+    aspectRatio: "4:5", 
+    useMagicPrompt: true, 
+    selectedLocationPreview: null, 
+    shotFocus: "Full Fit", 
+    prop: "", 
+    batchSize: 1,
+    socialContext: "Instagram Feed",
+    candidness: 20,
+    livedIn: false
+};
+
 export const INITIAL_MOTION: MotionSettings = { ...INITIAL_INFLUENCER, fps: "24fps", shutterAngle: "180", stabilization: "Gimbal", cameraType: "", lensType: "", filmStock: "", movement: "", customPrompt: "", resolution: "720p", sourceImage: null };

@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { InfluencerSettings } from '../types';
 import { INITIAL_INFLUENCER } from '../data/defaults';
 
-const INFLUENCER_SETTINGS_VERSION = 1;
+const INFLUENCER_SETTINGS_VERSION = 3; // Bumped version for Phase 3
 
 interface InfluencerSettingsState {
     version: number;

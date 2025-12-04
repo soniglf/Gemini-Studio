@@ -139,12 +139,19 @@ export const TRANSLATIONS = {
         GEN_ERROR: "Error",
 
         // --- DYNAMIC OPTIONS (EN) ---
-        // Shot Type
-        OPT_SHOT_EXTREME_CLOSE_UP: "Extreme Close-up",
-        OPT_SHOT_HEADSHOT: "Headshot",
-        OPT_SHOT_WAIST_UP: "Waist Up",
+        // Shot Type - Upgraded
+        OPT_SHOT_EXTREME_CLOSE_UP: "Extreme Close-Up",
+        OPT_SHOT_CLOSE_UP: "Close-Up",
+        OPT_SHOT_MEDIUM_CLOSE_UP: "Medium Close-Up (Head & Shoulders)",
+        OPT_SHOT_MEDIUM_SHOT: "Medium Shot (Waist Up)",
+        OPT_SHOT_COWBOY_SHOT: "Cowboy Shot (Thighs Up)",
         OPT_SHOT_FULL_BODY: "Full Body",
-        OPT_SHOT_LOW_ANGLE: "Low Angle",
+        OPT_SHOT_WIDE_SHOT: "Wide / Environmental",
+        OPT_SHOT_LOW_ANGLE: "Low Angle / Hero",
+        OPT_SHOT_HIGH_ANGLE: "High Angle",
+        OPT_SHOT_OVERHEAD: "Overhead / Birds Eye",
+        OPT_SHOT_DUTCH_ANGLE: "Dutch Angle / Tilted",
+
         // Lighting
         OPT_LIGHTING_SOFTBOX: "Softbox",
         OPT_LIGHTING_REMBRANDT: "Rembrandt",
@@ -346,12 +353,19 @@ export const TRANSLATIONS = {
         GEN_ERROR: "Error",
 
         // --- DYNAMIC OPTIONS (ES) ---
-        // Shot Type
+        // Shot Type - Upgraded
         OPT_SHOT_EXTREME_CLOSE_UP: "Primerísimo Primer Plano",
-        OPT_SHOT_HEADSHOT: "Primer Plano",
-        OPT_SHOT_WAIST_UP: "Plano Medio",
-        OPT_SHOT_FULL_BODY: "Cuerpo Entero",
+        OPT_SHOT_CLOSE_UP: "Primer Plano",
+        OPT_SHOT_MEDIUM_CLOSE_UP: "Plano Medio Corto",
+        OPT_SHOT_MEDIUM_SHOT: "Plano Medio",
+        OPT_SHOT_COWBOY_SHOT: "Plano Americano",
+        OPT_SHOT_FULL_BODY: "Plano Entero",
+        OPT_SHOT_WIDE_SHOT: "Plano General",
         OPT_SHOT_LOW_ANGLE: "Contrapicado",
+        OPT_SHOT_HIGH_ANGLE: "Picado",
+        OPT_SHOT_OVERHEAD: "Cenital",
+        OPT_SHOT_DUTCH_ANGLE: "Plano Holandés",
+
         // Lighting
         OPT_LIGHTING_SOFTBOX: "Caja Suave (Softbox)",
         OPT_LIGHTING_REMBRANDT: "Rembrandt",

@@ -3,6 +3,7 @@ import React, { useState, useEffect, memo } from 'react';
 import { GeneratedAsset } from '../../types';
 import { Video, Image as ImageIcon, CheckCircle, X, AlertCircle } from 'lucide-react';
 import { useInView } from '../../hooks/useInView';
+import { db } from '../../services/db';
 
 interface AssetCardProps {
     asset: GeneratedAsset;
@@ -17,24 +18,42 @@ export const AssetCard: React.FC<AssetCardProps> = memo(({ asset, isSelected, is
     const [objectUrl, setObjectUrl] = useState<string | null>(null);
     const [error, setError] = useState(false);
 
-    // [Project Apollo 2.0] Lazy Hydration Logic
+    // [Citadel Update] Lazy Hydration from IndexedDB
     useEffect(() => {
-        if (isInView && !objectUrl && asset.blob) {
-            const url = URL.createObjectURL(asset.blob);
-            setObjectUrl(url);
-            // Cleanup on unmount or when out of view (optional, sticking to unmount for now to prevent flicker)
-            return () => URL.revokeObjectURL(url);
-        }
-    }, [isInView, asset.blob]);
+        let active = true;
 
-    // Cleanup if component unmounts while url exists
-    useEffect(() => {
+        const loadBlob = async () => {
+            if (objectUrl) return; // Already loaded
+            
+            // 1. Try Asset (if passed directly via props, e.g., pending items)
+            if (asset.blob) {
+                if (active) setObjectUrl(URL.createObjectURL(asset.blob));
+                return;
+            }
+
+            // 2. Fetch from DB (Lazy Load)
+            if (isInView && !asset.id.startsWith('pending-')) {
+                try {
+                    const fullAsset = await db.assets.get(asset.id);
+                    if (active && fullAsset?.blob) {
+                        setObjectUrl(URL.createObjectURL(fullAsset.blob));
+                    }
+                } catch (e) {
+                    console.error("Lazy load failed", e);
+                    setError(true);
+                }
+            }
+        };
+
+        loadBlob();
+
         return () => {
+            active = false;
+            // Cleanup URL on unmount to free memory
             if (objectUrl) URL.revokeObjectURL(objectUrl);
         };
-    }, [objectUrl]);
+    }, [isInView, asset.blob, asset.id]);
 
-    // Fallback if no blob but url exists in asset (unlikely with new system but robust)
     const displayUrl = objectUrl || (asset.url && !asset.url.startsWith('blob:') ? asset.url : null);
 
     return (
